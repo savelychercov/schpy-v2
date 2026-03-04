@@ -1266,7 +1266,7 @@ def global_exception_handler(exctype, value, tb: traceback):  # noqa
         f.write(
             f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Произошла не обработанная ошибка: {value}\n\n"
         )
-    if hasattr(MainWindow, '_instance') and MainWindow._instance.data:
+    if hasattr(MainWindow, '_instance') and MainWindow._instance is not None and hasattr(MainWindow._instance, 'data') and MainWindow._instance.data:
         db.save_data(MainWindow._instance.data)
     sys.__excepthook__(exctype, value, traceback)
     sys.exit(1)

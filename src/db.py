@@ -50,8 +50,8 @@ from pathlib import Path
 from typing import Optional
 
 from sqlalchemy import (
-    create_engine, Column, Integer, String, Boolean, Text, 
-    ForeignKey, LargeBinary
+    create_engine, Column, Integer, String, Boolean, Text,
+    ForeignKey, LargeBinary, UniqueConstraint
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
@@ -67,6 +67,7 @@ from src.schemas import (
     RoomSchema,
     DataSchema
 )
+
 
 # region Classes
 
@@ -567,72 +568,149 @@ class TeacherModel(Base):
             groups=set(json.loads(self.groups))
         )
 
+
+# region SQLAlchemy Models (Improved)
+
+Base = declarative_base()
+
+
+class TeacherModel(Base):
+    __tablename__ = 'teachers'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, unique=True, nullable=False)
+    disciplines = Column(Text, nullable=False)  # JSON сериализация set
+    groups = Column(Text, nullable=False)  # JSON сериализация set
+
+    # Связь с расписанием (один преподаватель -> много записей расписания)
+    schedules = relationship("TeacherScheduleModel", back_populates="teacher", cascade="all, delete-orphan")
+
+    def to_teacher(self):
+        """Конвертация в объект Teacher"""
+        import json
+        return Teacher(
+            name=self.name,
+            disciplines=set(json.loads(self.disciplines)),
+            groups=set(json.loads(self.groups))
+        )
+
+
 class TeacherScheduleModel(Base):
     __tablename__ = 'teachers_schedule'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    teacher_name = Column(String, ForeignKey('teachers.name'), nullable=False)
-    day = Column(String, nullable=False)
-    schedule = Column(Text, nullable=False)  # JSON сериализация list[bool]
-    
+    teacher_id = Column(Integer, ForeignKey('teachers.id', ondelete='CASCADE'), nullable=False)
+    day = Column(String, nullable=False)  # день недели
+    pair_number = Column(Integer, nullable=False)  # номер пары (1-6)
+    is_free = Column(Boolean, default=True)  # True - свободно, False - занято
+
     # Связь с преподавателем
     teacher = relationship("TeacherModel", back_populates="schedules")
 
+    __table_args__ = (
+        # Уникальность: один преподаватель не может иметь две записи для одного дня и пары
+        UniqueConstraint('teacher_id', 'day', 'pair_number', name='unique_teacher_day_pair'),
+    )
+
+
 class RoomModel(Base):
     __tablename__ = 'rooms'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, unique=True, nullable=False)
     is_online = Column(Boolean, default=False)
-    
+
     # Связь с расписанием
     schedules = relationship("RoomScheduleModel", back_populates="room", cascade="all, delete-orphan")
 
+
 class RoomScheduleModel(Base):
     __tablename__ = 'rooms_schedule'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    room_name = Column(String, ForeignKey('rooms.name'), nullable=False)
+    room_id = Column(Integer, ForeignKey('rooms.id', ondelete='CASCADE'), nullable=False)
     day = Column(String, nullable=False)
-    schedule = Column(Text, nullable=False)  # JSON сериализация list[bool]
-    
+    pair_number = Column(Integer, nullable=False)  # номер пары (1-6)
+    is_available = Column(Boolean, default=True)  # True - доступно, False - занято
+
     # Связь с аудиторией
     room = relationship("RoomModel", back_populates="schedules")
 
-class MainDataModel(Base):
-    __tablename__ = 'main_data'
-    
-    id = Column(Integer, primary_key=True, default=1)
-    counter = Column(Integer, default=1)
+    __table_args__ = (
+        # Уникальность: одна аудитория не может иметь две записи для одного дня и пары
+        UniqueConstraint('room_id', 'day', 'pair_number', name='unique_room_day_pair'),
+    )
 
-class DisciplineHoursModel(Base):
-    __tablename__ = 'discipline_hours'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    group_name = Column(String, nullable=False)
-    discipline_name = Column(String, nullable=False)
-    hours = Column(Integer, nullable=False)
 
-class GroupsShiftModel(Base):
-    __tablename__ = 'groups_shift'
-    
+class GroupModel(Base):
+    __tablename__ = 'groups'
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    group_name = Column(String, nullable=False)
+    name = Column(String, unique=True, nullable=False)
+    shift_number = Column(Integer, nullable=False)  # 1, 2, or 3
+
+    # Связи
+    discipline_hours = relationship("DisciplineHoursModel", back_populates="group", cascade="all, delete-orphan")
+    shift_pairs = relationship("GroupShiftPairModel", back_populates="group", cascade="all, delete-orphan")
+
+
+class GroupShiftPairModel(Base):
+    __tablename__ = 'groups_shift_pairs'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    group_id = Column(Integer, ForeignKey('groups.id', ondelete='CASCADE'), nullable=False)
     pair_number = Column(Integer, nullable=False)
-    # Сохраняем PairTime как JSON
-    start_time = Column(String, nullable=False)
+    start_time = Column(String, nullable=False)  # HH:MM:SS
     end_time = Column(String, nullable=False)
     pair_type = Column(String, nullable=False)
 
-class ScheduleTimeShiftModel(Base):
-    __tablename__ = 'schedule_time_shift'
-    
+    # Связь с группой
+    group = relationship("GroupModel", back_populates="shift_pairs")
+
+    __table_args__ = (
+        UniqueConstraint('group_id', 'pair_number', name='unique_group_pair'),
+    )
+
+
+class ShiftTimeModel(Base):
+    __tablename__ = 'shift_times'
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     shift_number = Column(Integer, nullable=False)  # 1, 2, or 3
     pair_number = Column(Integer, nullable=False)
-    start_time = Column(String, nullable=False)
+    start_time = Column(String, nullable=False)  # HH:MM:SS
     end_time = Column(String, nullable=False)
     pair_type = Column(String, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('shift_number', 'pair_number', name='unique_shift_pair'),
+    )
+
+
+class DisciplineHoursModel(Base):
+    __tablename__ = 'discipline_hours'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    group_id = Column(Integer, ForeignKey('groups.id', ondelete='CASCADE'), nullable=False)
+    discipline_name = Column(String, nullable=False)
+    hours = Column(Integer, nullable=False)
+
+    # Связь с группой
+    group = relationship("GroupModel", back_populates="discipline_hours")
+
+    __table_args__ = (
+        UniqueConstraint('group_id', 'discipline_name', name='unique_group_discipline'),
+    )
+
+
+class MainDataModel(Base):
+    __tablename__ = 'main_data'
+
+    id = Column(Integer, primary_key=True, default=1)
+    counter = Column(Integer, default=1)
+
+
+# endregion
 
 # endregion
 
@@ -682,13 +760,15 @@ def get_db_session():
     return SessionLocal()
 
 
+# region SQLAlchemy Database Functions (Improved)
+
 def save_data_sqlalchemy(data) -> None:
     """Сохранение данных с использованием SQLAlchemy + Pydantic схемы"""
     print("Сохранение данных в SQLAlchemy базу")
-    
+
     if SessionLocal is None:
         init_db()
-    
+
     session = get_db_session()
     try:
         # Обновляем счетчик
@@ -698,124 +778,131 @@ def save_data_sqlalchemy(data) -> None:
         else:
             main_data = MainDataModel(id=1, counter=data.counter + 1)
             session.add(main_data)
-        
-        # Очищаем существующие данные
+
+        # Очищаем существующие данные (в правильном порядке из-за ForeignKey)
         session.query(TeacherScheduleModel).delete()
         session.query(TeacherModel).delete()
         session.query(RoomScheduleModel).delete()
         session.query(RoomModel).delete()
         session.query(DisciplineHoursModel).delete()
-        session.query(GroupsShiftModel).delete()
-        session.query(ScheduleTimeShiftModel).delete()
-        
-        # Сохраняем преподавателей через Pydantic схему
+        session.query(GroupShiftPairModel).delete()
+        session.query(GroupModel).delete()
+        session.query(ShiftTimeModel).delete()
+
+        # Сохраняем преподавателей
+        teachers_map = {}  # имя -> id
         for teacher_name, teacher_list in data.teachers.items():
             for teacher in teacher_list:
-                # Конвертируем в Pydantic схему
                 teacher_schema = TeacherSchema(
                     name=teacher.name,
                     disciplines=list(teacher.disciplines),
                     groups=list(teacher.groups)
                 )
-                
+
                 teacher_model = TeacherModel(
                     name=teacher_schema.name,
                     disciplines=json.dumps(list(teacher_schema.disciplines), ensure_ascii=False),
                     groups=json.dumps(list(teacher_schema.groups), ensure_ascii=False)
                 )
                 session.add(teacher_model)
-                
-                # Сохраняем расписание преподавателя через Pydantic схему
+                session.flush()  # чтобы получить id
+                teachers_map[teacher.name] = teacher_model.id
+
+                # Сохраняем расписание преподавателя
                 if teacher.name in data.teachers_work_hours:
                     schedule = data.teachers_work_hours[teacher.name]
-                    
-                    # Создаем полную схему расписания
-                    schedule_dict = {}
-                    for day in ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']:
-                        schedule_dict[day] = schedule.schedule_for_days.get(day, [False] * 6)
-                    
-                    schedule_schema = TeachersScheduleSchema(**schedule_dict)
-                    
-                    # Сохраняем каждый день отдельно
-                    for day, schedule_list in schedule_dict.items():
-                        schedule_model = TeacherScheduleModel(
-                            teacher_name=teacher.name,
-                            day=day,
-                            schedule=json.dumps(schedule_list, ensure_ascii=False)
-                        )
-                        session.add(schedule_model)
-        
-        # Сохраняем аудитории через Pydantic схему
+                    for day, day_schedule in schedule.schedule_for_days.items():
+                        for pair_num, is_free in enumerate(day_schedule, 1):
+                            schedule_model = TeacherScheduleModel(
+                                teacher_id=teacher_model.id,
+                                day=day,
+                                pair_number=pair_num,
+                                is_free=is_free
+                            )
+                            session.add(schedule_model)
+
+        # Сохраняем аудитории
+        rooms_map = {}  # имя -> id
         for room_name, room_schedule in data.rooms_availability_hours.items():
             is_online = room_name.startswith("Д")  # Д - онлайн аудитории
-            
-            room_schema = RoomSchema(is_online=is_online)
-            
+
             room_model = RoomModel(
                 name=room_name,
-                is_online=room_schema.is_online
+                is_online=is_online
             )
             session.add(room_model)
-            
-            # Сохраняем расписание аудитории через Pydantic схему
-            schedule_dict = {}
-            for day in ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']:
-                schedule_dict[day] = room_schedule.schedule_for_days.get(day, [False] * 6)
-            
-            schedule_schema = RoomScheduleSchema(**schedule_dict)
-            
-            # Сохраняем каждый день отдельно
-            for day, schedule_list in schedule_dict.items():
-                schedule_model = RoomScheduleModel(
-                    room_name=room_name,
-                    day=day,
-                    schedule=json.dumps(schedule_list, ensure_ascii=False)
+            session.flush()
+            rooms_map[room_name] = room_model.id
+
+            # Сохраняем расписание аудитории
+            for day, day_schedule in room_schedule.schedule_for_days.items():
+                for pair_num, is_available in enumerate(day_schedule, 1):
+                    schedule_model = RoomScheduleModel(
+                        room_id=room_model.id,
+                        day=day,
+                        pair_number=pair_num,
+                        is_available=is_available
+                    )
+                    session.add(schedule_model)
+
+        # Сохраняем группы
+        groups_map = {}  # имя -> id
+        for group_name, shift_dict in data.groups_shift.items():
+            # Определяем номер смены (по первому элементу)
+            shift_number = 1  # значение по умолчанию
+            if group_name in data.groups_shift:
+                # Можно определить по наличию в schedule_time_shift
+                pass
+
+            group_model = GroupModel(
+                name=group_name,
+                shift_number=shift_number
+            )
+            session.add(group_model)
+            session.flush()
+            groups_map[group_name] = group_model.id
+
+            # Сохраняем расписание пар для группы
+            for pair_number, pair_time in shift_dict.items():
+                shift_pair_model = GroupShiftPairModel(
+                    group_id=group_model.id,
+                    pair_number=pair_number,
+                    start_time=pair_time.start.strftime('%H:%M:%S'),
+                    end_time=pair_time.end.strftime('%H:%M:%S'),
+                    pair_type=pair_time.pair_type
                 )
-                session.add(schedule_model)
-        
+                session.add(shift_pair_model)
+
         # Сохраняем discipline_hours
-        if hasattr(data, 'discipline_hours') and data.discipline_hours:
-            for group_name, disciplines in data.discipline_hours.items():
+        for group_name, disciplines in data.discipline_hours.items():
+            if group_name in groups_map:
                 for discipline_name, hours in disciplines.items():
                     discipline_model = DisciplineHoursModel(
-                        group_name=group_name,
+                        group_id=groups_map[group_name],
                         discipline_name=discipline_name,
                         hours=hours
                     )
                     session.add(discipline_model)
-        
-        # Сохраняем groups_shift
-        if hasattr(data, 'groups_shift') and data.groups_shift:
-            for group_name, shift_dict in data.groups_shift.items():
-                for pair_number, pair_time in shift_dict.items():
-                    shift_model = GroupsShiftModel(
-                        group_name=group_name,
-                        pair_number=pair_number,
-                        start_time=pair_time.start.strftime('%H:%M:%S'),
-                        end_time=pair_time.end.strftime('%H:%M:%S'),
-                        pair_type=pair_time.pair_type
-                    )
-                    session.add(shift_model)
-        
+
         # Сохраняем schedule_time_shift
         for shift_name, shift_dict in [('schedule_time_shift_1', data.schedule_time_shift_1),
                                        ('schedule_time_shift_2', data.schedule_time_shift_2),
                                        ('schedule_time_shift_3', data.schedule_time_shift_3)]:
             if hasattr(data, shift_name) and shift_dict:
-                shift_number = shift_name.split('_')[-1]
+                shift_number = int(shift_name.split('_')[-1])
                 for pair_number, pair_time in shift_dict.items():
-                    time_shift_model = ScheduleTimeShiftModel(
-                        shift_number=int(shift_number),
+                    time_shift_model = ShiftTimeModel(
+                        shift_number=shift_number,
                         pair_number=pair_number,
                         start_time=pair_time.start.strftime('%H:%M:%S'),
                         end_time=pair_time.end.strftime('%H:%M:%S'),
                         pair_type=pair_time.pair_type
                     )
                     session.add(time_shift_model)
-        
+
         session.commit()
         print("Данные успешно сохранены")
-        
+
     except Exception as e:
         session.rollback()
         print(f"Ошибка при сохранении данных: {e}")
@@ -827,10 +914,10 @@ def save_data_sqlalchemy(data) -> None:
 def load_data_sqlalchemy() -> Data:
     """Загрузка данных с использованием SQLAlchemy + Pydantic схемы"""
     print("Загрузка данных из SQLAlchemy базы")
-    
+
     if SessionLocal is None:
         init_db()
-    
+
     session = get_db_session()
     try:
         # Проверяем, есть ли данные
@@ -841,156 +928,148 @@ def load_data_sqlalchemy() -> Data:
             example_data = ExampleData()
             save_data_sqlalchemy(example_data)
             return example_data
-        
+
         # Создаем объект данных
         data = EmptyData()
-        
+
         # Загружаем счетчик
         main_data = session.query(MainDataModel).filter_by(id=1).first()
         data.counter = main_data.counter if main_data else 1
-        
-        # Загружаем discipline_hours
-        discipline_models = session.query(DisciplineHoursModel).all()
-        data.discipline_hours = {}
-        for discipline_model in discipline_models:
-            if discipline_model.group_name not in data.discipline_hours:
-                data.discipline_hours[discipline_model.group_name] = {}
-            data.discipline_hours[discipline_model.group_name][discipline_model.discipline_name] = discipline_model.hours
-        
-        # Загружаем преподавателей через Pydantic схемы
+
+        # Загружаем преподавателей и их расписание
         teacher_models = session.query(TeacherModel).all()
         data.teachers = {}
         data.teachers_work_hours = {}
-        
+
         for teacher_model in teacher_models:
-            # Конвертируем в Pydantic схему для валидации
             teacher_schema = TeacherSchema(
                 name=teacher_model.name,
-                disciplines=json.loads(teacher_model.disciplines),
-                groups=json.loads(teacher_model.groups)
+                disciplines=set(json.loads(teacher_model.disciplines)),
+                groups=set(json.loads(teacher_model.groups))
             )
-            
+
             teacher = Teacher(
                 name=teacher_schema.name,
-                disciplines=set(teacher_schema.disciplines),
-                groups=set(teacher_schema.groups)
+                disciplines=teacher_schema.disciplines,
+                groups=teacher_schema.groups
             )
-            
-            # Восстанавливаем структуру словаря
+
             if teacher.name not in data.teachers:
                 data.teachers[teacher.name] = []
             data.teachers[teacher.name].append(teacher)
-            
+
             # Создаем расписание преподавателя
-            if teacher.name not in data.teachers_work_hours:
-                teachers_schedule = TeachersSchedule()
-                data.teachers_work_hours[teacher.name] = teachers_schedule
-        
-        # Загружаем расписание преподавателей через Pydantic схемы
-        schedule_models = session.query(TeacherScheduleModel).all()
-        
-        # Группируем расписание по преподавателям
-        teacher_schedules = {}
-        for schedule_model in schedule_models:
-            if schedule_model.teacher_name not in teacher_schedules:
-                teacher_schedules[schedule_model.teacher_name] = {}
-            teacher_schedules[schedule_model.teacher_name][schedule_model.day] = json.loads(schedule_model.schedule)
-        
-        # Восстанавливаем расписание через Pydantic схемы
-        for teacher_name, schedule_dict in teacher_schedules.items():
-            if teacher_name in data.teachers_work_hours:
-                # Создаем полную схему для валидации
-                full_schedule_dict = {}
-                for day in ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']:
-                    full_schedule_dict[day] = schedule_dict.get(day, [False] * 6)
+            teachers_schedule = TeachersSchedule()
+
+            # Загружаем расписание из БД
+            schedule_models = session.query(TeacherScheduleModel).filter_by(teacher_id=teacher_model.id).all()
+            for schedule_model in schedule_models:
+                # Проверяем, что день существует в расписании
+                if schedule_model.day not in teachers_schedule.schedule_for_days:
+                    print(f"Предупреждение: неизвестный день '{schedule_model.day}' для преподавателя {teacher.name}")
+                    continue
                 
-                schedule_schema = TeachersScheduleSchema(**full_schedule_dict)
-                
-                # Сохраняем валидированные данные
-                for day, schedule_list in full_schedule_dict.items():
-                    data.teachers_work_hours[teacher_name].schedule_for_days[day] = schedule_list
-        
-        # Загружаем аудитории через Pydantic схемы
+                # Инициализируем день если нужно
+                if teachers_schedule.schedule_for_days[schedule_model.day] is None:
+                    teachers_schedule.schedule_for_days[schedule_model.day] = [False] * 6
+
+                # Проверяем границы номера пары
+                if not 1 <= schedule_model.pair_number <= 6:
+                    print(f"Предупреждение: некорректный номер пары {schedule_model.pair_number} для преподавателя {teacher.name}")
+                    continue
+
+                # Устанавливаем значение
+                teachers_schedule.schedule_for_days[schedule_model.day][
+                    schedule_model.pair_number - 1] = schedule_model.is_free
+
+            data.teachers_work_hours[teacher.name] = teachers_schedule
+
+        # Загружаем аудитории и их расписание
         room_models = session.query(RoomModel).all()
         data.rooms_availability_hours = {}
         data.rooms = {}
-        
+
         for room_model in room_models:
-            # Конвертируем в Pydantic схему для валидации
-            room_schema = RoomSchema(is_online=room_model.is_online)
-            
             room_schedule = RoomSchedule()
+
+            # Загружаем расписание из БД
+            schedule_models = session.query(RoomScheduleModel).filter_by(room_id=room_model.id).all()
+            for schedule_model in schedule_models:
+                # Проверяем, что день существует в расписании
+                if schedule_model.day not in room_schedule.schedule_for_days:
+                    print(f"Предупреждение: неизвестный день '{schedule_model.day}' для аудитории {room_model.name}")
+                    continue
+                
+                if room_schedule.schedule_for_days[schedule_model.day] is None:
+                    room_schedule.schedule_for_days[schedule_model.day] = [False] * 6
+                
+                # Проверяем границы номера пары
+                if not 1 <= schedule_model.pair_number <= 6:
+                    print(f"Предупреждение: некорректный номер пары {schedule_model.pair_number} для аудитории {room_model.name}")
+                    continue
+                
+                room_schedule.schedule_for_days[schedule_model.day][
+                    schedule_model.pair_number - 1] = not schedule_model.is_available
+
             data.rooms_availability_hours[room_model.name] = room_schedule
-            
-            # Создаем объект Room для data.rooms
-            room = Room(is_online=room_model.is_online)
-            data.rooms[room_model.name] = room
-        
-        # Загружаем расписание аудиторий через Pydantic схемы
-        room_schedule_models = session.query(RoomScheduleModel).all()
-        
-        # Группируем расписание по аудиториям
-        room_schedules = {}
-        for schedule_model in room_schedule_models:
-            if schedule_model.room_name not in room_schedules:
-                room_schedules[schedule_model.room_name] = {}
-            room_schedules[schedule_model.room_name][schedule_model.day] = json.loads(schedule_model.schedule)
-        
-        # Восстанавливаем расписание через Pydantic схемы
-        for room_name, schedule_dict in room_schedules.items():
-            if room_name in data.rooms_availability_hours:
-                # Создаем полную схему для валидации
-                full_schedule_dict = {}
-                for day in ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']:
-                    full_schedule_dict[day] = schedule_dict.get(day, [False] * 6)
-                
-                schedule_schema = RoomScheduleSchema(**full_schedule_dict)
-                
-                # Сохраняем валидированные данные
-                for day, schedule_list in full_schedule_dict.items():
-                    data.rooms_availability_hours[room_name].schedule_for_days[day] = schedule_list
-        
-        # Загружаем groups_shift
-        group_shift_models = session.query(GroupsShiftModel).all()
+            data.rooms[room_model.name] = Room(is_online=room_model.is_online)
+
+        # Загружаем группы и их расписание
+        group_models = session.query(GroupModel).all()
         data.groups_shift = {}
-        for shift_model in group_shift_models:
-            if shift_model.group_name not in data.groups_shift:
-                data.groups_shift[shift_model.group_name] = {}
-            
-            # Восстанавливаем PairTime
-            from datetime import time
+        data.discipline_hours = {}
+
+        for group_model in group_models:
+            # Загружаем расписание пар для группы
+            shift_pairs = {}
+            pair_models = session.query(GroupShiftPairModel).filter_by(group_id=group_model.id).all()
+            for pair_model in pair_models:
+                pair_time = PairTime(
+                    start=time.fromisoformat(pair_model.start_time),
+                    end=time.fromisoformat(pair_model.end_time),
+                    pair_type=pair_model.pair_type
+                )
+                shift_pairs[pair_model.pair_number] = pair_time
+            data.groups_shift[group_model.name] = shift_pairs
+
+            # Загружаем часы дисциплин
+            discipline_models = session.query(DisciplineHoursModel).filter_by(group_id=group_model.id).all()
+            if group_model.name not in data.discipline_hours:
+                data.discipline_hours[group_model.name] = {}
+            for disc_model in discipline_models:
+                data.discipline_hours[group_model.name][disc_model.discipline_name] = disc_model.hours
+
+        # Загружаем временные интервалы смен
+        shift_models = session.query(ShiftTimeModel).all()
+        data.schedule_time_shift_1 = {}
+        data.schedule_time_shift_2 = {}
+        data.schedule_time_shift_3 = {}
+
+        for shift_model in shift_models:
             pair_time = PairTime(
                 start=time.fromisoformat(shift_model.start_time),
                 end=time.fromisoformat(shift_model.end_time),
                 pair_type=shift_model.pair_type
             )
-            data.groups_shift[shift_model.group_name][shift_model.pair_number] = pair_time
-        
-        # Загружаем schedule_time_shift
-        time_shift_models = session.query(ScheduleTimeShiftModel).all()
-        for shift_model in time_shift_models:
-            shift_name = f"schedule_time_shift_{shift_model.shift_number}"
-            if not hasattr(data, shift_name):
-                setattr(data, shift_name, {})
-            
-            # Восстанавливаем PairTime
-            start_time = time.fromisoformat(shift_model.start_time)
-            end_time = time.fromisoformat(shift_model.end_time)
-            pair_time = PairTime(
-                start=start_time,
-                end=end_time,
-                pair_type=shift_model.pair_type
-            )
-            getattr(data, shift_name)[shift_model.pair_number] = pair_time
-        
+
+            if shift_model.shift_number == 1:
+                data.schedule_time_shift_1[shift_model.pair_number] = pair_time
+            elif shift_model.shift_number == 2:
+                data.schedule_time_shift_2[shift_model.pair_number] = pair_time
+            elif shift_model.shift_number == 3:
+                data.schedule_time_shift_3[shift_model.pair_number] = pair_time
+
         print("Данные успешно загружены")
         return data
-        
+
     except Exception as e:
         print(f"Ошибка при загрузке данных: {e}")
         raise
     finally:
         session.close()
+
+
+# endregion
 
 
 def save_data(data) -> None:
