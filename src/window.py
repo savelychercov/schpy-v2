@@ -69,6 +69,10 @@ from config.constants import (
     HELP_LABEL_WIDTH,
     MAX_ITERATIONS,
     MIN_ITERATIONS,
+    SECONDS_PER_MINUTE,
+    SHIFT_ONE,
+    SHIFT_THREE,
+    SHIFT_TWO,
     WINDOW_HEIGHT,
     WINDOW_WIDTH,
     WINDOW_X,
@@ -90,7 +94,7 @@ logger = get_logger("window")
 class ScheduleGeneratorWorkerThread(QThread):
     result_ready = pyqtSignal(schedule_maker.Schedule, dict)
 
-    def __init__(self, iterations: int, data):
+    def __init__(self, iterations: int, data):  # noqa: ANN001
         super().__init__()
         self.iterations = iterations
         self.data = data
@@ -234,7 +238,7 @@ class ScheduleGeneratorDialog(QDialog):
             self.progress_bar.setValue(int(self.worker_thread.progress_value))
             remaining_time = self.worker_thread.remaining_time
             self.remaining_time_label.setText(
-                f"Осталось времени: {str(round(remaining_time // 59)) + 'м, ' if remaining_time >= 60 else ''}"
+                f"Осталось времени: {str(round(remaining_time // 59)) + 'м, ' if remaining_time >= SECONDS_PER_MINUTE else ''}"
                 f"{round(remaining_time % 59)!s}с."
             )
 
@@ -356,8 +360,8 @@ class InputDataDialog(QDialog):
         try:
             db.save_data(self.data)
             logger.info("Data automatically saved on dialog close")
-        except Exception as e:
-            logger.exception("Error during auto save: %s", e)
+        except Exception:
+            logger.exception("Error during auto save")
         event.accept()
 
     def load_test_data(self):
@@ -474,55 +478,55 @@ class InputDataDialog(QDialog):
         self.data_table.setEditTriggers(QTableWidget.DoubleClicked)
         self.data_table.resizeColumnsToContents()
 
-    def _display_groups_shift(self, variable_data) -> None:
+    def _display_groups_shift(self, variable_data: dict) -> None:
         """Display groups shift data in table."""
         self.var_help_label.setText(QMessageBoxHelpTexts.GROUPS_SHIFT_HELP.value)
         headers = ["Группа", "Смена"]
         self.data_table.setColumnCount(len(headers))
         self.data_table.setHorizontalHeaderLabels(headers)
-        
+
         for row, (group, schedule) in enumerate(variable_data.items()):
             shift = self._determine_shift(schedule)
             self.data_table.insertRow(row)
             self.data_table.setItem(row, 0, QTableWidgetItem(group))
             self.data_table.setItem(row, 1, QTableWidgetItem(shift))
 
-    def _determine_shift(self, schedule) -> str:
+    def _determine_shift(self, schedule: dict) -> str:
         """Determine shift number based on schedule."""
         if not schedule or 1 not in schedule:
             return None
-            
+
         first_pair = schedule[1]
-        
+
         # Check all shifts independently
         if 1 in self.data.schedule_time_shift_1:
             shift1_first = self.data.schedule_time_shift_1[1]
-            if (first_pair.start == shift1_first.start and 
+            if (first_pair.start == shift1_first.start and
                 first_pair.end == shift1_first.end):
                 return "1"
 
         if 1 in self.data.schedule_time_shift_2:
             shift2_first = self.data.schedule_time_shift_2[1]
-            if (first_pair.start == shift2_first.start and 
+            if (first_pair.start == shift2_first.start and
                 first_pair.end == shift2_first.end):
                 return "2"
 
         if 1 in self.data.schedule_time_shift_3:
             shift3_first = self.data.schedule_time_shift_3[1]
-            if (first_pair.start == shift3_first.start and 
+            if (first_pair.start == shift3_first.start and
                 first_pair.end == shift3_first.end):
                 return "3"
-                
+
         return None
 
-    def _display_discipline_hours(self, variable_data) -> None:
+    def _display_discipline_hours(self, variable_data: dict) -> None:
         """Display discipline hours data in table."""
         self.var_help_label.setText(
             QMessageBoxHelpTexts.DISCIPLINE_HOURS_HELP.value
         )
         self.data_table.setColumnCount(3)
         self.data_table.setHorizontalHeaderLabels(["Группа", "Дисциплина", "Часы"])
-        
+
         row = 0
         for group, disciplines in variable_data.items():
             for discipline, hours in disciplines.items():
@@ -532,12 +536,12 @@ class InputDataDialog(QDialog):
                 self.data_table.setItem(row, 2, QTableWidgetItem(str(hours)))
                 row += 1
 
-    def _display_teachers(self, variable_data) -> None:
+    def _display_teachers(self, variable_data: dict) -> None:
         """Display teachers data in table."""
         self.var_help_label.setText(QMessageBoxHelpTexts.TEACHERS_HELP.value)
         self.data_table.setColumnCount(3)
         self.data_table.setHorizontalHeaderLabels(["Имя", "Дисциплины", "Группы"])
-        
+
         row = 0
         for name, presets in variable_data.items():
             for teacher in presets:
@@ -551,12 +555,12 @@ class InputDataDialog(QDialog):
                 )
                 row += 1
 
-    def _display_rooms(self, variable_data) -> None:
+    def _display_rooms(self, variable_data: dict) -> None:
         """Display rooms data in table."""
         self.var_help_label.setText(QMessageBoxHelpTexts.ROOMS_HELP.value)
         self.data_table.setColumnCount(2)
         self.data_table.setHorizontalHeaderLabels(["Аудитория", "Онлайн"])
-        
+
         for row, (room, room_obj) in enumerate(variable_data.items()):
             self.data_table.insertRow(row)
             self.data_table.setItem(row, 0, QTableWidgetItem(room))
@@ -564,7 +568,7 @@ class InputDataDialog(QDialog):
                 row, 1, QTableWidgetItem("Да" if room_obj.is_online else "Нет")
             )
 
-    def _display_schedule_data(self, variable_name: str, variable_data) -> None:
+    def _display_schedule_data(self, variable_name: str, variable_data: dict) -> None:
         """Display schedule data for teachers or rooms."""
         if variable_name == "teachers_work_hours":
             self.var_help_label.setText(
@@ -641,7 +645,7 @@ class InputDataDialog(QDialog):
 
         try:
             variable_data = getattr(self.data, table_name)
-            
+
             if table_name == "groups_shift":
                 variable_data = self._save_groups_shift(variable_data, invalid_data)
             elif table_name == "discipline_hours":
@@ -658,7 +662,7 @@ class InputDataDialog(QDialog):
 
         except AttributeError:
             self._show_save_empty_fields_error()
-        except Exception as e:
+        except (OSError, ValueError, TypeError) as e:
             self._show_critical_save_error(e)
 
     def _get_table_display_name(self, table_name: str) -> str:
@@ -671,68 +675,66 @@ class InputDataDialog(QDialog):
     def _save_groups_shift(self, variable_data: dict, invalid_data: list) -> dict:
         """Save groups shift data."""
         variable_data = {}  # Reset variable
-        
+
         for row in range(self.data_table.rowCount()):
             try:
                 group = self.data_table.item(row, 0).text()
                 shift = int(self.data_table.item(row, 1).text())
-                
+
                 schedule = self._get_schedule_by_shift(shift)
                 variable_data[group] = schedule
-                
+
             except (ValueError, AttributeError, IndexError):
                 invalid_data.append(self._get_row_data(row))
-                
+
         return variable_data
 
-    def _get_schedule_by_shift(self, shift: int):
+    def _get_schedule_by_shift(self, shift: int) -> dict:
         """Get schedule data by shift number."""
-        if shift == 1:
+        if shift == SHIFT_ONE:
             return self.data.schedule_time_shift_1
-        elif shift == 2:
+        if shift == SHIFT_TWO:
             return self.data.schedule_time_shift_2
-        elif shift == 3:
+        if shift == SHIFT_THREE:
             return self.data.schedule_time_shift_3
-        else:
-            msg = "Неверный номер смены"
-            raise ValueError(msg)
+        msg = "Неверный номер смены"
+        raise ValueError(msg)
 
     def _save_discipline_hours(self, variable_data: dict, invalid_data: list) -> dict:
         """Save discipline hours data."""
         variable_data = {}
-        
+
         for row in range(self.data_table.rowCount()):
             try:
                 group = self._get_group_from_cell(row)
                 discipline = self.data_table.item(row, 1).text()
                 hours = int(self.data_table.item(row, 2).text())
-                
+
                 if group not in variable_data:
                     variable_data[group] = {}
                 variable_data[group][discipline] = hours
-                
+
             except (ValueError, AttributeError):
                 invalid_data.append(self._get_row_data(row))
-                
+
         return variable_data
 
     def _get_group_from_cell(self, row: int) -> str:
         """Get group name from table cell."""
         if self.data_table.item(row, 0) is None:
             return self.data_table.cellWidget(row, 0).currentText()
-        else:
-            return self.data_table.item(row, 0).text()
+        return self.data_table.item(row, 0).text()
 
     def _save_teachers(self, variable_data: dict, invalid_data: list) -> dict:
         """Save teachers data."""
         variable_data = {}
-        
+
         for row in range(self.data_table.rowCount()):
             try:
                 name = self.data_table.item(row, 0).text()
                 disciplines = set(self.data_table.item(row, 1).text().split(", "))
                 groups = set(self.data_table.item(row, 2).text().split(", "))
-                
+
                 if name not in variable_data:
                     variable_data[name] = [db.Teacher(name, disciplines, groups)]
                 else:
@@ -740,7 +742,7 @@ class InputDataDialog(QDialog):
 
                 if name not in self.data.teachers_work_hours:
                     self.data.teachers_work_hours[name] = db.TeachersSchedule()
-                    
+
             except AttributeError:
                 invalid_data.append(self._get_row_data(row))
 
@@ -759,16 +761,16 @@ class InputDataDialog(QDialog):
     def _save_rooms(self, variable_data: dict, invalid_data: list) -> dict:
         """Save rooms data."""
         variable_data = {}
-        
+
         for row in range(self.data_table.rowCount()):
             try:
                 room = self.data_table.item(row, 0).text()
                 is_online = self.data_table.item(row, 1).text() == "Да"
                 variable_data[room] = db.Room(is_online)
-                
+
                 if room not in self.data.rooms_availability_hours:
                     self.data.rooms_availability_hours[room] = db.RoomSchedule()
-                    
+
             except AttributeError:
                 invalid_data.append(self._get_row_data(row))
 
@@ -783,7 +785,7 @@ class InputDataDialog(QDialog):
                 data_copy.pop(room)
         self.data.rooms_availability_hours = data_copy
 
-    def _save_schedule_data(self, variable_data) -> None:
+    def _save_schedule_data(self, variable_data: dict) -> None:
         """Save schedule data for teachers or rooms."""
         try:
             self._save_schedule_changes(variable_data)

@@ -10,6 +10,15 @@ class ExportError(Exception):
     """Исключение для ошибок экспорта расписания."""
 
 
+# Номера смен
+SHIFT_ONE = 1
+SHIFT_TWO = 2
+SHIFT_THREE = 3
+
+# Временные константы
+SECONDS_PER_MINUTE = 60
+
+
 class PairType(str, Enum):
     """Типы учебных пар."""
 

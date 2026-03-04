@@ -194,7 +194,7 @@ class DataSchema(BaseModel):
 
     @field_validator("teachers_schedule_time")
     @classmethod
-    def validate_schedule_time(cls, v):
+    def validate_schedule_time(cls, v):  # noqa: ANN001
         """Валидация временных интервалов пар"""
         for number, (start, end) in v.items():
             if start >= end:
