@@ -1,0 +1,82 @@
+QWidget {
+    font: 11pt "MS Shell Dlg 2";
+    background-color: #f0f0f0;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+}
+
+QTableWidget {
+    font-family: Arial, sans-serif;
+    font-size: 20px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 5px;
+    background-color: #ffffff;
+}
+
+QTableWidget::item {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+QHeaderView::section {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px;
+    font-weight: bold;
+}
+
+QTableWidget::item:selected {
+    background-color: #d1e7dd;
+    color: black;
+}
+
+QPushButton {
+    font-size: 14px;
+    font-weight: bold;
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    height: 40px;
+}
+
+QPushButton:hover {
+    background-color: #45a049;
+}
+
+QMessageBox {
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+QMessageBox QLabel {
+    color: black;
+    background-color: #c1f7c3;
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 20px;
+}
+
+QMessageBox QPushButton {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 5px 15px;
+    font-weight: bold;
+}
+
+QPushButton:disabled {
+    background-color: #1f5721;
+}
+
+QLabel {
+    font-size: 20px;
+    color: #333;
+    margin: 5px 0;
+    background-color: #ddd;
+}

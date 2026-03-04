@@ -1,0 +1,67 @@
+QDialog {
+    font: 12pt "Arial";
+    background-color: #f9f9f9;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+}
+
+QListWidget {
+    font: 11pt "Arial";
+    border: 1px solid #4CAF50;
+    border-radius: 5px;
+    background-color: #ffffff;
+    padding: 5px;
+}
+
+QListWidget::item {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+QListWidget::item:selected {
+    color: black;
+    background-color: #d1e7dd; /* Цвет выделенной строки */
+}
+
+QLabel {
+    font-size: 20px;
+    color: #333;
+    margin: 5px 0;
+    background-color: #ddd;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+QVBoxLayout {
+    margin: 10px;
+}
+
+QPushButton {
+    font-size: 14px;
+    font-weight: bold;
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    height: 40px;
+}
+
+QPushButton:hover {
+    background-color: #45a049;
+}
+
+
+QDialog QPushButton {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px;
+    font-size: 14px;
+}
+
+QDialog QPushButton:hover {
+    background-color: #45a049; /* Цвет кнопки при наведении */
+}

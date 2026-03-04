@@ -1,0 +1,117 @@
+QListWidget {
+    font: 12pt "Arial";
+    border: 1px solid #4CAF50;
+    width: 150px;
+    border-radius: 5px;
+    background-color: #ffffff;
+    padding: 5px;
+}
+
+QListWidget::item {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+QListWidget::item:selected {
+    color: black;
+    background-color: #d1e7dd; /* Цвет выделенной строки */
+}
+
+QLabel {
+    font-size: 20px;
+    color: #333;
+    margin: 5px 0;
+    background-color: #ddd;
+}
+
+QPushButton {
+    font-size: 14px;
+    font-weight: bold;
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    height: 40px;
+}
+
+QPushButton:hover {
+    background-color: #45a049;
+}
+
+QMessageBox {
+    font: 12pt "Arial";
+    background-color: #f9f9f9;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 5px;
+}
+
+QMessageBox QPushButton {
+    font-size: 16px;
+    height: 40px;
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+}
+
+QMessageBox QLabel {
+    font-size: 20px;
+    color: #333;
+    margin: 5px 0;
+    background-color: #fff;
+}
+
+QTableWidget {
+    font-family: Arial, sans-serif;
+    font-size: 20px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 5px;
+    background-color: #ffffff;
+}
+
+QTableWidget::item {
+    padding-left: 10px;
+    padding-right: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+QHeaderView::section {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px;
+    font-weight: bold;
+}
+
+QTableWidget::item:selected {
+    background-color: #d1e7dd;
+    color: black;
+}
+
+QComboBox {
+    font: 12pt "Arial";
+    border: 1px solid #4CAF50;
+    width: 150px;
+    border-radius: 5px;
+    background-color: #ffffff;
+    height: 20px;
+    width: 40px;
+    margin: -15px;
+    padding-left: 20px;
+}
+
+QLabel {
+    font-size: 20px;
+    color: #333;
+    margin: 5px 0;
+    background-color: #ddd;
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
+    height: 40px;
+}
