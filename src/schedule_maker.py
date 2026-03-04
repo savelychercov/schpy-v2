@@ -26,6 +26,7 @@ import copy
 from dataclasses import dataclass
 
 from config.logger import get_logger
+from config.constants import RoomPrefix, PairType, DAYS
 from src import db
 from src.schemas import (
     DataSchema,
@@ -63,7 +64,7 @@ def print_schedule(schedule: dict[str, list[PairSchema]]) -> None:
 
 def sorted_pairs(pairs: dict[str, list[PairSchema]]) -> dict[str, list[PairSchema]]:
     for group in pairs:
-        pairs[group] = sorted(pairs[group], key=lambda p: db.days.index(p.day))
+        pairs[group] = sorted(pairs[group], key=lambda p: DAYS.index(p.day))
     return pairs
 
 
@@ -133,7 +134,7 @@ def choose_a_pair_time(
     shift = data.groups_shift[group]
     teachers_schedule = data.teachers_work_hours[teacher.name]
     # Ищем первое свободное время для дисциплины
-    for day in db.days:
+    for day in DAYS:
         for number, pair_time in shift.items():
             if number in [pair.number for pair in existing_pairs if pair.day == day]:
                 continue
@@ -209,17 +210,17 @@ def distribute_classrooms(
         for pair in list_of_pairs:
             if pair.classroom is not None:
                 continue
-            if pair.pair_type == "Онлайн":  # Если онлайн
+            if pair.pair_type == PairType.ONLINE.value:  # Если онлайн
                 _available_rooms_list = [
                     (room, sc)
                     for room, sc in available_rooms.items()
-                    if room.startswith("Д")
+                    if room.startswith(RoomPrefix.DIGITAL.value)
                 ]
             else:
                 _available_rooms_list = [
                     (room, sc)
                     for room, sc in available_rooms.items()
-                    if room.startswith("К")
+                    if room.startswith(RoomPrefix.CLASSROOM.value)
                 ]
             for room, room_schedule in _available_rooms_list:
                 day_schedule = room_schedule.schedule_for_days[pair.day]

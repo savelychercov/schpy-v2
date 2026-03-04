@@ -75,6 +75,20 @@ from src.schemas import (
     TeachersScheduleSchema,
 )
 
+from config.constants import (
+    PairType,
+    DayOfWeek,
+    RoomPrefix,
+    PAIRS_PER_DAY,
+    MAX_PAIR_NUMBER,
+    MIN_PAIR_NUMBER,
+    TEACHERS_SCHEDULE_TIME,
+    DAYS,
+    WORKWEEK_DAYS,
+    DB_FILE,
+    DB_PATH_NAME,
+)
+
 # region Classes
 
 
@@ -169,14 +183,14 @@ class TeachersSchedule:  # teachers_schedule: day, pairs
         }
         for day in self.schedule_for_days:
             if self.schedule_for_days[day] is None:
-                self.schedule_for_days[day] = [False] * 6
-            while len(self.schedule_for_days[day]) < 6:
+                self.schedule_for_days[day] = [False] * PAIRS_PER_DAY
+            while len(self.schedule_for_days[day]) < PAIRS_PER_DAY:
                 self.schedule_for_days[day].append(False)
 
     @staticmethod
     def get_pair_number(pair_time: PairTime) -> int | None:
         # Get number from teachers_schedule_time
-        for number, (start, end) in teachers_schedule_time.items():
+        for number, (start, end) in TEACHERS_SCHEDULE_TIME.items():
             # print(f"{start} <= {pair_time} <= {end}: {pair_time.start <= end and pair_time.end >= start}")
             # Check if the pair_time overlaps with the scheduled time
             if pair_time.start <= end and pair_time.end >= start:  # M
@@ -236,13 +250,13 @@ class RoomSchedule:
         }
         for day in self.schedule_for_days:
             if self.schedule_for_days[day] is None:
-                self.schedule_for_days[day] = [False] * 6
-            while len(self.schedule_for_days[day]) < 6:
+                self.schedule_for_days[day] = [False] * PAIRS_PER_DAY
+            while len(self.schedule_for_days[day]) < PAIRS_PER_DAY:
                 self.schedule_for_days[day].append(False)
 
     @staticmethod
     def get_pair_number(pair_time: PairTime) -> int | None:
-        for number, (start, end) in teachers_schedule_time.items():
+        for number, (start, end) in TEACHERS_SCHEDULE_TIME.items():
             if pair_time.start <= end and pair_time.end >= start:
                 return number
         return None
@@ -261,34 +275,7 @@ class Room:
 
 # region Constants
 
-
-offline_str = "Офлайн"
-online_str = "Онлайн"
-
-
-db_file = "db.pickle"
-db_path_name = "SchPyPickleData"
-
-days = (
-    "Понедельник",
-    "Вторник",
-    "Среда",
-    "Четверг",
-    "Пятница",
-    "Суббота",
-    "Воскресенье",
-)
-workweek_days = ("Понедельник", "Вторник", "Среда", "Четверг", "Пятница")
-
-# CONST
-teachers_schedule_time = {
-    1: (time(8, 0), time(9, 30)),  # first pair for 1 shift, online for 2 shift
-    2: (time(9, 40), time(11, 10)),  # second pair for 1 shift
-    3: (time(11, 30), time(13, 0)),  # first pair for 2 shift, online for 3 shift
-    4: (time(13, 10), time(14, 40)),  # second pair for 2 shift
-    5: (time(15, 0), time(16, 30)),  # first pair for 3 shift
-    6: (time(16, 40), time(18, 10)),  # second pair for 3 shift, online for 1 shift
-}
+# Удалены - перенесены в config.constants
 
 # endregion
 
@@ -302,8 +289,8 @@ class Data(ABC):
         raise NotImplementedError
 
     counter: int
-    days: list = days
-    teachers_schedule_time: dict = teachers_schedule_time
+    days: list = DAYS
+    teachers_schedule_time: dict = TEACHERS_SCHEDULE_TIME
     schedule_time_shift_1: dict[int, PairTime]
     schedule_time_shift_2: dict[int, PairTime]
     schedule_time_shift_3: dict[int, PairTime]
@@ -318,8 +305,8 @@ class Data(ABC):
 class EmptyData(Data):
     def __init__(self):
         self.counter = 1
-        self.days = days
-        self.teachers_schedule_time = teachers_schedule_time
+        self.days = DAYS
+        self.teachers_schedule_time = TEACHERS_SCHEDULE_TIME
         self.schedule_time_shift_1 = {}
         self.schedule_time_shift_2 = {}
         self.schedule_time_shift_3 = {}
@@ -335,32 +322,62 @@ class ExampleData(Data):
     def __init__(self):
         self.counter = 1
 
-        self.days = days
+        self.days = DAYS
 
-        self.teachers_schedule_time = teachers_schedule_time
+        self.teachers_schedule_time = TEACHERS_SCHEDULE_TIME
 
         self.schedule_time_shift_1 = {  # time schedule for first shift
-            1: PairTime(time(8, 0), time(9, 30), offline_str),
-            2: PairTime(time(9, 40), time(11, 10), offline_str),
-            3: PairTime(time(16, 40), time(17, 40), online_str),
+            1: PairTime(time(8, 0), time(9, 30), PairType.OFFLINE.value),
+            2: PairTime(time(9, 40), time(11, 10), PairType.OFFLINE.value),
+            3: PairTime(time(16, 40), time(17, 40), PairType.ONLINE.value),
         }
 
         self.schedule_time_shift_2 = {  # time schedule for second shift
-            1: PairTime(time(8, 0), time(9, 0), online_str),
-            2: PairTime(time(11, 30), time(13, 0), offline_str),
-            3: PairTime(time(13, 10), time(14, 40), offline_str),
+            1: PairTime(time(8, 0), time(9, 0), PairType.ONLINE.value),
+            2: PairTime(time(11, 30), time(13, 0), PairType.OFFLINE.value),
+            3: PairTime(time(13, 10), time(14, 40), PairType.OFFLINE.value),
         }
 
         self.schedule_time_shift_3 = {  # time schedule for third shift
-            1: PairTime(time(11, 50), time(12, 50), online_str),
-            2: PairTime(time(15, 0), time(16, 30), offline_str),
-            3: PairTime(time(16, 40), time(18, 10), offline_str),
+            1: PairTime(time(11, 50), time(12, 50), PairType.ONLINE.value),
+            2: PairTime(time(15, 0), time(16, 30), PairType.OFFLINE.value),
+            3: PairTime(time(16, 40), time(18, 10), PairType.OFFLINE.value),
         }
 
         self.groups_shift = {
             "П9024": self.schedule_time_shift_1,
             "П9022": self.schedule_time_shift_2,
             "П9021": self.schedule_time_shift_3,
+        }
+        
+        # Создаем правильное расписание для групп согласно вашим данным
+        # П9024: пары 1, 2, 3 (08:00-09:00, 11:30-13:00, 13:10-14:40)
+        # П9022: пары 1, 2, 3 (08:00-09:00, 11:30-13:00, 13:10-14:40) 
+        # П9021: пары 1, 2, 3 (11:50-12:50, 15:00-16:30, 16:40-18:10)
+        
+        # Переопределяем расписание групп согласно вашим данным
+        custom_schedule_1 = {
+            1: PairTime(time(8, 0), time(9, 30), PairType.OFFLINE.value),  # Смена 1
+            2: PairTime(time(11, 30), time(13, 0), PairType.OFFLINE.value),
+            3: PairTime(time(13, 10), time(14, 40), PairType.OFFLINE.value),
+        }
+        
+        custom_schedule_2 = {
+            1: PairTime(time(8, 0), time(9, 0), PairType.OFFLINE.value),   # Смена 2
+            2: PairTime(time(11, 30), time(13, 0), PairType.OFFLINE.value),
+            3: PairTime(time(13, 10), time(14, 40), PairType.OFFLINE.value),
+        }
+        
+        custom_schedule_3 = {
+            1: PairTime(time(11, 50), time(12, 50), PairType.ONLINE.value),  # Смена 3
+            2: PairTime(time(15, 0), time(16, 30), PairType.OFFLINE.value),
+            3: PairTime(time(16, 40), time(18, 10), PairType.OFFLINE.value),
+        }
+        
+        self.groups_shift = {
+            "П9024": custom_schedule_1,
+            "П9022": custom_schedule_2,
+            "П9021": custom_schedule_3,
         }
 
         self.discipline_hours = {  # on current week
@@ -864,7 +881,7 @@ def save_data_sqlalchemy(data) -> None:
         # Сохраняем аудитории
         rooms_map = {}  # имя -> id
         for room_name, room_schedule in data.rooms_availability_hours.items():
-            is_online = room_name.startswith("Д")  # Д - онлайн аудитории
+            is_online = room_name.startswith(RoomPrefix.DIGITAL.value)  # Д - онлайн аудитории
 
             room_model = RoomModel(name=room_name, is_online=is_online)
             session.add(room_model)
@@ -885,11 +902,29 @@ def save_data_sqlalchemy(data) -> None:
         # Сохраняем группы
         groups_map = {}  # имя -> id
         for group_name, shift_dict in data.groups_shift.items():
-            # Определяем номер смены (по первому элементу)
+            # Определяем номер смены по расписанию группы
             shift_number = 1  # значение по умолчанию
-            if group_name in data.groups_shift:
-                # Можно определить по наличию в schedule_time_shift
-                pass
+            
+            # Проверяем по первой паре в расписании группы
+            if shift_dict and 1 in shift_dict:
+                first_pair = shift_dict[1]
+                
+                # Сравниваем время начала первой пары с эталонными расписаниями
+                if (hasattr(data, 'schedule_time_shift_1') and 
+                    1 in data.schedule_time_shift_1 and
+                    first_pair.start == data.schedule_time_shift_1[1].start and
+                    first_pair.end == data.schedule_time_shift_1[1].end):
+                    shift_number = 1
+                elif (hasattr(data, 'schedule_time_shift_2') and 
+                      1 in data.schedule_time_shift_2 and
+                      first_pair.start == data.schedule_time_shift_2[1].start and
+                      first_pair.end == data.schedule_time_shift_2[1].end):
+                    shift_number = 2
+                elif (hasattr(data, 'schedule_time_shift_3') and 
+                      1 in data.schedule_time_shift_3 and
+                      first_pair.start == data.schedule_time_shift_3[1].start and
+                      first_pair.end == data.schedule_time_shift_3[1].end):
+                    shift_number = 3
 
             group_model = GroupModel(name=group_name, shift_number=shift_number)
             session.add(group_model)
@@ -1025,10 +1060,10 @@ def load_data_sqlalchemy() -> Data:
                 if teachers_schedule.schedule_for_days[schedule_model.day] is None:
                     teachers_schedule.schedule_for_days[schedule_model.day] = [
                         False
-                    ] * 6
+                    ] * PAIRS_PER_DAY
 
                 # Проверяем границы номера пары
-                if not 1 <= schedule_model.pair_number <= 6:
+                if not MIN_PAIR_NUMBER <= schedule_model.pair_number <= MAX_PAIR_NUMBER:
                     logger.warning(
                         f"Некорректный номер пары {schedule_model.pair_number} для преподавателя {teacher.name}"
                     )
@@ -1062,10 +1097,10 @@ def load_data_sqlalchemy() -> Data:
                     continue
 
                 if room_schedule.schedule_for_days[schedule_model.day] is None:
-                    room_schedule.schedule_for_days[schedule_model.day] = [False] * 6
+                    room_schedule.schedule_for_days[schedule_model.day] = [False] * PAIRS_PER_DAY
 
                 # Проверяем границы номера пары
-                if not 1 <= schedule_model.pair_number <= 6:
+                if not MIN_PAIR_NUMBER <= schedule_model.pair_number <= MAX_PAIR_NUMBER:
                     logger.warning(
                         f"Некорректный номер пары {schedule_model.pair_number} для аудитории {room_model.name}"
                     )
@@ -1084,6 +1119,8 @@ def load_data_sqlalchemy() -> Data:
         data.discipline_hours = {}
 
         for group_model in group_models:
+            print(f"Загрузка группы: {group_model.name}, shift_number из БД: {group_model.shift_number}")
+            
             # Загружаем расписание пар для группы
             shift_pairs = {}
             pair_models = (
@@ -1098,6 +1135,9 @@ def load_data_sqlalchemy() -> Data:
                     pair_type=pair_model.pair_type,
                 )
                 shift_pairs[pair_model.pair_number] = pair_time
+                if pair_model.pair_number == 1:
+                    print(f"  Первая пара: {pair_model.start_time} - {pair_model.end_time}")
+            
             data.groups_shift[group_model.name] = shift_pairs
 
             # Загружаем часы дисциплин
@@ -1172,9 +1212,9 @@ def resource_path(relative_path):
 
 
 def get_data_file_path():
-    base_path = Path(os.path.expanduser("~")) / db_path_name
+    base_path = Path(os.path.expanduser("~")) / DB_PATH_NAME
     base_path.mkdir(parents=True, exist_ok=True)
-    return base_path / db_file
+    return base_path / DB_FILE
 
 
 # region Conversion Functions

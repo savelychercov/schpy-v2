@@ -45,6 +45,12 @@ import random
 import time
 
 from config.logger import get_logger
+from config.constants import (
+    MAX_WORKING_HOURS_FOR_TEACHER,
+    UNISSUED_HOURS_RATING_MODIFIER,
+    PairType,
+    WORKWEEK_DAYS,
+)
 from src import db, schedule_maker
 
 logger = get_logger("best_of")
@@ -52,10 +58,8 @@ logger = get_logger("best_of")
 teachers_gaps_rating_modifier = 5
 offline_pairs_gaps_rating_modifier = 13
 owervorked_teachers_rating_modifier = 50
-unissued_hours_rating_modifier = 3
 
 
-max_working_hours_for_teacher = 36
 
 
 # region Utils
@@ -141,9 +145,9 @@ def count_offline_pairs_gaps(pairs: dict[str, list[db.Pair]], data_obj: db.Data)
         offline_pair_numbers = [
             number
             for number, pair_time in data_obj.groups_shift[group].items()
-            if pair_time.pair_type == db.offline_str
+            if pair_time.pair_type == PairType.OFFLINE.value
         ]
-        for day in db.workweek_days:
+        for day in WORKWEEK_DAYS:
             offline_pair_numbers_for_day = [
                 pair.number
                 for pair in list_of_pairs
@@ -165,7 +169,7 @@ def count_overworked_teachers(pairs: dict[str, list[db.Pair]]) -> int:
             count_hours_for_teachers[pair.teacher] += 2
     count = 0
     for count_hours in count_hours_for_teachers.values():
-        if count_hours > max_working_hours_for_teacher:
+        if count_hours > MAX_WORKING_HOURS_FOR_TEACHER:
             count += 1
     return count
 
@@ -189,7 +193,7 @@ def rate_schedule(
     # logger.debug(f"after overworked_teachers {rate}")
 
     unissued_hours = count_unissued_hours(remaining_data)
-    rate = sub_percentage(rate, unissued_hours * unissued_hours_rating_modifier)
+    rate = sub_percentage(rate, unissued_hours * UNISSUED_HOURS_RATING_MODIFIER)
     # logger.debug(f"after unissued_hours {rate}")
 
     return max(0, rate)
