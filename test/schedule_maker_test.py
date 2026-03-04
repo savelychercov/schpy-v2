@@ -13,7 +13,8 @@
 
 import unittest
 
-from src import db, schedule_maker as sm
+from src import db
+from src import schedule_maker as sm
 
 
 def check_legit_pair(pair: db.Pair, data: db.Data):

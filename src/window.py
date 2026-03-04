@@ -60,9 +60,10 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from src import best_of
-from src import db
-from src import schedule_maker
+from config.logger import get_logger
+from src import best_of, db, schedule_maker
+
+logger = get_logger("window")
 
 
 class ScheduleGeneratorWorkerThread(QThread):
@@ -81,12 +82,14 @@ class ScheduleGeneratorWorkerThread(QThread):
         self.is_running = True
 
     def run(self):
+        logger.info(f"Запуск потока генерации расписания ({self.iterations} итераций)")
         start_time = time.time()
 
         for iteration in range(1, self.iterations + 1):
             if not self.is_running:
+                logger.info("Поток генерации остановлен")
                 break
-            print(f"Итерация {iteration}/{self.iterations}")
+            logger.debug(f"Итерация {iteration}/{self.iterations}")
             # Обновляем только переменные прогресса
             passed_time = time.time() - start_time
             approx_time = self.iterations * passed_time / iteration
@@ -126,10 +129,12 @@ class ScheduleGeneratorWorkerThread(QThread):
             "overworked_teachers": self.best_schedule_counts["overworked_teachers"],
             "unissued_hours": self.best_schedule_counts["unissued_hours"],
         }
+        logger.info(f"Поток генерации завершен, лучший рейтинг: {self.best_rating}")
         self.result_ready.emit(self.best_schedule_obj, rating)
         self.stop()
 
     def stop(self):
+        logger.debug("Остановка потока генерации")
         self.is_running = False
         self.quit()
 
@@ -138,6 +143,7 @@ class ScheduleGeneratorDialog(QDialog):
     result_obtained = pyqtSignal(schedule_maker.Schedule, dict)
 
     def __init__(self, data):
+        logger.debug("Создание диалога генерации расписания")
         super().__init__()
         self.data = data
         self.update_timer = QTimer()
@@ -254,6 +260,7 @@ class ScheduleGeneratorDialog(QDialog):
 
 class InputDataDialog(QDialog):
     def __init__(self, data=None):
+        logger.debug("Создание диалога ввода данных")
         super().__init__(parent=None)
 
         with open(db.resource_path("../css/InputDataDialog.css")) as f:
@@ -318,17 +325,16 @@ class InputDataDialog(QDialog):
         self.layout.addLayout(self.button_layout)
 
         self.current_variable = None
-        
+
         # Use passed data or load from database
         if data is not None:
             self.data = data
+        # Initialize data attribute - load from database or create empty data
+        elif db.check_exists_data():
+            self.data = db.load_data()
         else:
-            # Initialize data attribute - load from database or create empty data
-            if db.check_exists_data():
-                self.data = db.load_data()
-            else:
-                self.data = db.EmptyData()
-        
+            self.data = db.EmptyData()
+
         # Select the first item in the variable list
         if self.variable_list.count() > 0:
             self.variable_list.setCurrentRow(0)
@@ -337,9 +343,9 @@ class InputDataDialog(QDialog):
         # Auto-save data when dialog is closed
         try:
             db.save_data(self.data)
-            print("Данные автоматически сохранены при закрытии диалога")
+            logger.info("Данные автоматически сохранены при закрытии диалога")
         except Exception as e:
-            print(f"Ошибка при автоматическом сохранении: {e}")
+            logger.error(f"Ошибка при автоматическом сохранении: {e}")
         event.accept()
 
     def load_test_data(self):
@@ -780,6 +786,7 @@ class InputDataDialog(QDialog):
 
 class ErrorDialog(QDialog):
     def __init__(self, errors: list, remaining_data: db.Data):
+        logger.debug(f"Создание диалога ошибок, количество ошибок: {len(errors)}")
         super().__init__()
         self.setWindowTitle("Ошибки при генерации расписания")
         self.setGeometry(
@@ -1053,9 +1060,14 @@ class MainWindow(QMainWindow):
         self.resize_columns()
 
     def generate_schedule(self):
+        import time
+        start_time = time.time()
+        logger.info("Генерация расписания")
         sch = schedule_maker.make_full_schedule(self.data)
         self.current_schedule = sch
         self.errors = sch.errors
+        elapsed_time = time.time() - start_time
+        logger.info(f"Расписание сгенерировано, ошибок: {len(sch.errors)}, время: {elapsed_time:.2f}с")
         self.remaining_data = sch.remaining_data
         rating = {
             "rate": best_of.rate_schedule(sch.pairs, self.data, sch.remaining_data)
@@ -1082,6 +1094,7 @@ class MainWindow(QMainWindow):
             error_dialog.exec_()
 
     def export_schedule(self):
+        logger.info("Начало экспорта расписания в Excel")
         class ExportException(Exception):
             pass
 
@@ -1093,6 +1106,7 @@ class MainWindow(QMainWindow):
                 raise ExportException("Расписание не сформировано")
 
             file_name = f"ExportSchedule{int(self.rating['rate'])}{datetime.datetime.now().strftime('%H%M%S')}.xlsx"
+            logger.info(f"Создание файла: {file_name}")
 
             exp_data = []
             for row in range(row_count):
@@ -1183,13 +1197,17 @@ class MainWindow(QMainWindow):
 
             if resp == QMessageBox.Ok:
                 import os
-
+                logger.info(f"Открытие файла: {file_name}")
                 os.startfile(file_name)
-        except ExportException:
+            else:
+                logger.info("Файл не открыт по выбору пользователя")
+        except ExportException as e:
+            logger.warning(f"Ошибка экспорта: {e}")
             QMessageBox.warning(
                 self, "Ошибка", "Сгенерируйте расписание перед выгрузкой"
             )
         except Exception as e:
+            logger.error(f"Ошибка при экспорте расписания: {e}")
             QMessageBox.warning(self, "Ошибка", str(e))
             raise e
 
@@ -1225,6 +1243,7 @@ class MainWindow(QMainWindow):
         self.sort_by_button.setEnabled(True)
 
     def generate_best_schedule(self):
+        logger.info("Запуск оптимизации расписания")
         dialog = ScheduleGeneratorDialog(self.data)
         dialog.result_obtained.connect(self.handle_generator_result)
         if dialog.exec_() == QDialog.Accepted:
@@ -1239,7 +1258,9 @@ class MainWindow(QMainWindow):
     def handle_generator_result(
         self, result: schedule_maker.Schedule, rating: dict[str, int]
     ):
+        logger.info(f"Получен результат генерации, рейтинг: {rating['rate']}")
         if self.rating is not None and self.rating["rate"] > rating["rate"]:
+            logger.warning("Новое расписание хуже предыдущего")
             resp = QMessageBox.question(
                 self,
                 "Внимание",
@@ -1261,13 +1282,18 @@ class MainWindow(QMainWindow):
 
 
 def global_exception_handler(exctype, value, tb: traceback):  # noqa
-    print("Произошла необработанная ошибка:", value)
+    logger.error(f"Произошла необработанная ошибка: {value}")
+    # Сохраняем в старый файл для совместимости
     with open("../error_log.txt", "a", encoding="utf-8") as f:
         f.write(
             f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Произошла не обработанная ошибка: {value}\n\n"
         )
-    if hasattr(MainWindow, '_instance') and MainWindow._instance is not None and hasattr(MainWindow._instance, 'data') and MainWindow._instance.data:
-        db.save_data(MainWindow._instance.data)
+    if hasattr(MainWindow, "_instance") and MainWindow._instance is not None and hasattr(MainWindow._instance, "data") and MainWindow._instance.data:
+        try:
+            db.save_data(MainWindow._instance.data)
+            logger.info("Данные автоматически сохранены после ошибки")
+        except Exception as save_error:
+            logger.error(f"Не удалось сохранить данные после ошибки: {save_error}")
     sys.__excepthook__(exctype, value, traceback)
     sys.exit(1)
 
@@ -1277,10 +1303,10 @@ sys.excepthook = global_exception_handler
 if __name__ == "__main__":
     if db.check_exists_data():
         data = db.load_data()
-        print(f"Запуск программы (№{data.counter})")
+        logger.info(f"Запуск программы (№{data.counter})")
     else:
         data = db.ExampleData()
-        print("Запуск программы в первый раз")
+        logger.info("Запуск программы в первый раз")
     app = QApplication(sys.argv)
     window = MainWindow(data)
     window.show()

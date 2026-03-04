@@ -24,17 +24,18 @@
 
 import copy
 from dataclasses import dataclass
-from typing import Dict, List
 
+from config.logger import get_logger
 from src import db
 from src.schemas import (
+    DataSchema,
     PairSchema,
     PairTimeSchema,
-    TeacherSchema,
-    TeachersScheduleSchema,
     RoomScheduleSchema,
-    DataSchema
+    TeacherSchema,
 )
+
+logger = get_logger("schedule_maker")
 
 
 class ScheduleError(ValueError):
@@ -47,27 +48,28 @@ class ScheduleError(ValueError):
 
 @dataclass
 class Schedule:
-    pairs: Dict[str, List[PairSchema]]
-    errors: List[ScheduleError]
+    pairs: dict[str, list[PairSchema]]
+    errors: list[ScheduleError]
     remaining_data: DataSchema
 
 
-def print_schedule(schedule: Dict[str, List[PairSchema]]) -> None:
+def print_schedule(schedule: dict[str, list[PairSchema]]) -> None:
+    logger.debug("Вывод расписания:")
     for group in schedule:
-        print(group)
+        logger.debug(f"Группа: {group}")
         for pair in schedule[group]:
-            print(pair)
+            logger.debug(f"  {pair}")
 
 
-def sorted_pairs(pairs: Dict[str, List[PairSchema]]) -> Dict[str, List[PairSchema]]:
+def sorted_pairs(pairs: dict[str, list[PairSchema]]) -> dict[str, list[PairSchema]]:
     for group in pairs:
         pairs[group] = sorted(pairs[group], key=lambda p: db.days.index(p.day))
     return pairs
 
 
 def get_schedule_for(
-    key: str, pairs: Dict[str, List[PairSchema]], value: str
-) -> Dict[str, List[PairSchema]]:
+    key: str, pairs: dict[str, list[PairSchema]], value: str
+) -> dict[str, list[PairSchema]]:
     pairs_list = copy.deepcopy(pairs)
     for group in pairs_list:
         match key:
@@ -112,15 +114,16 @@ def get_schedule_for(
     return pairs_list
 
 
-def print_errors(errors_list: List[ScheduleError]) -> None:
+def print_errors(errors_list: list[ScheduleError]) -> None:
+    logger.warning(f"Ошибки расписания ({len(errors_list)}):")
     for error in errors_list:
-        print(
+        logger.warning(
             f"Невозможно поставить пару для группы {error.group}, для дисциплины {error.discipline}, оставшиеся часы: {error.hours}"
         )
 
 
 def choose_a_pair_time(
-    existing_pairs: List[PairSchema],
+    existing_pairs: list[PairSchema],
     discipline: str,
     group: str,
     teacher: TeacherSchema,
@@ -162,7 +165,7 @@ def choose_a_pair_time(
 
 def distribute_pairs(
     data: DataSchema,
-) -> tuple[Dict[str, List[PairSchema]], List[ScheduleError]]:
+) -> tuple[dict[str, list[PairSchema]], list[ScheduleError]]:
     full_schedule = {}  # Словарь для хранения расписания по группам
     errors = []
     remaining_hours = data.discipline_hours
@@ -200,9 +203,9 @@ def distribute_pairs(
     return full_schedule, errors  # Возвращаем полное расписание
 
 
-def distribute_classrooms(raw_sch: Dict, data: DataSchema) -> Dict[str, List[PairSchema]]:
+def distribute_classrooms(raw_sch: dict, data: DataSchema) -> dict[str, list[PairSchema]]:
     raw_sch = raw_sch.copy()
-    available_rooms: Dict[str, RoomScheduleSchema] = data.rooms_availability_hours
+    available_rooms: dict[str, RoomScheduleSchema] = data.rooms_availability_hours
     for group, list_of_pairs in raw_sch.items():
         for pair in list_of_pairs:
             if pair.classroom is not None:
@@ -234,10 +237,21 @@ def distribute_classrooms(raw_sch: Dict, data: DataSchema) -> Dict[str, List[Pai
 
 
 def make_full_schedule(data: DataSchema) -> Schedule:
+    import time
+    start_time = time.time()
+    logger.info("Начало генерации полного расписания")
+    logger.debug(f"Входные данные: групп={len(data.discipline_hours)}, преподавателей={len(data.teachers)}")
+    
     data = copy.deepcopy(data)
     full_schedule, errors = distribute_pairs(data)
+    logger.info(f"Распределение пар завершено, ошибок: {len(errors)}")
+    
     full_schedule = distribute_classrooms(full_schedule, data)
+    logger.info("Распределение аудиторий завершено")
+    
     full_schedule = sorted_pairs(full_schedule)
+    elapsed_time = time.time() - start_time
+    logger.info(f"Генерация расписания завершена, групп: {len(full_schedule)}, время: {elapsed_time:.2f}с")
     return Schedule(pairs=full_schedule, errors=errors, remaining_data=data)
 
 

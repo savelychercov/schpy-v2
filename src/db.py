@@ -41,33 +41,39 @@
 на основе структур, определённых здесь.
 """
 
+import json
 import os
-import pickle
 import sys
 from abc import ABC, abstractmethod
 from datetime import time, timedelta
 from pathlib import Path
-from typing import Optional
 
 from sqlalchemy import (
-    create_engine, Column, Integer, String, Boolean, Text,
-    ForeignKey, LargeBinary, UniqueConstraint
+    Boolean,
+    Column,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
 )
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
-from sqlalchemy.dialects.sqlite import JSON
-import json
+from sqlalchemy.orm import relationship, sessionmaker
+
+from config.logger import get_logger
+
+logger = get_logger("db")
 
 from src.schemas import (
-    PairTimeSchema,
+    DataSchema,
     PairSchema,
-    TeacherSchema,
-    TeachersScheduleSchema,
+    PairTimeSchema,
     RoomScheduleSchema,
     RoomSchema,
-    DataSchema
+    TeacherSchema,
+    TeachersScheduleSchema,
 )
-
 
 # region Classes
 
@@ -549,16 +555,16 @@ class ExampleData(Data):
 Base = declarative_base()
 
 class TeacherModel(Base):
-    __tablename__ = 'teachers'
-    
+    __tablename__ = "teachers"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, unique=True, nullable=False)
     disciplines = Column(Text, nullable=False)  # JSON сериализация set
     groups = Column(Text, nullable=False)        # JSON сериализация set
-    
+
     # Связь с расписанием
     schedules = relationship("TeacherScheduleModel", back_populates="teacher", cascade="all, delete-orphan")
-    
+
     def to_teacher(self):
         """Конвертация в объект Teacher"""
         import json
@@ -575,7 +581,7 @@ Base = declarative_base()
 
 
 class TeacherModel(Base):
-    __tablename__ = 'teachers'
+    __tablename__ = "teachers"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, unique=True, nullable=False)
@@ -596,10 +602,10 @@ class TeacherModel(Base):
 
 
 class TeacherScheduleModel(Base):
-    __tablename__ = 'teachers_schedule'
+    __tablename__ = "teachers_schedule"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    teacher_id = Column(Integer, ForeignKey('teachers.id', ondelete='CASCADE'), nullable=False)
+    teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False)
     day = Column(String, nullable=False)  # день недели
     pair_number = Column(Integer, nullable=False)  # номер пары (1-6)
     is_free = Column(Boolean, default=True)  # True - свободно, False - занято
@@ -609,12 +615,12 @@ class TeacherScheduleModel(Base):
 
     __table_args__ = (
         # Уникальность: один преподаватель не может иметь две записи для одного дня и пары
-        UniqueConstraint('teacher_id', 'day', 'pair_number', name='unique_teacher_day_pair'),
+        UniqueConstraint("teacher_id", "day", "pair_number", name="unique_teacher_day_pair"),
     )
 
 
 class RoomModel(Base):
-    __tablename__ = 'rooms'
+    __tablename__ = "rooms"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, unique=True, nullable=False)
@@ -625,10 +631,10 @@ class RoomModel(Base):
 
 
 class RoomScheduleModel(Base):
-    __tablename__ = 'rooms_schedule'
+    __tablename__ = "rooms_schedule"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    room_id = Column(Integer, ForeignKey('rooms.id', ondelete='CASCADE'), nullable=False)
+    room_id = Column(Integer, ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False)
     day = Column(String, nullable=False)
     pair_number = Column(Integer, nullable=False)  # номер пары (1-6)
     is_available = Column(Boolean, default=True)  # True - доступно, False - занято
@@ -638,12 +644,12 @@ class RoomScheduleModel(Base):
 
     __table_args__ = (
         # Уникальность: одна аудитория не может иметь две записи для одного дня и пары
-        UniqueConstraint('room_id', 'day', 'pair_number', name='unique_room_day_pair'),
+        UniqueConstraint("room_id", "day", "pair_number", name="unique_room_day_pair"),
     )
 
 
 class GroupModel(Base):
-    __tablename__ = 'groups'
+    __tablename__ = "groups"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, unique=True, nullable=False)
@@ -655,10 +661,10 @@ class GroupModel(Base):
 
 
 class GroupShiftPairModel(Base):
-    __tablename__ = 'groups_shift_pairs'
+    __tablename__ = "groups_shift_pairs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    group_id = Column(Integer, ForeignKey('groups.id', ondelete='CASCADE'), nullable=False)
+    group_id = Column(Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
     pair_number = Column(Integer, nullable=False)
     start_time = Column(String, nullable=False)  # HH:MM:SS
     end_time = Column(String, nullable=False)
@@ -668,12 +674,12 @@ class GroupShiftPairModel(Base):
     group = relationship("GroupModel", back_populates="shift_pairs")
 
     __table_args__ = (
-        UniqueConstraint('group_id', 'pair_number', name='unique_group_pair'),
+        UniqueConstraint("group_id", "pair_number", name="unique_group_pair"),
     )
 
 
 class ShiftTimeModel(Base):
-    __tablename__ = 'shift_times'
+    __tablename__ = "shift_times"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     shift_number = Column(Integer, nullable=False)  # 1, 2, or 3
@@ -683,15 +689,15 @@ class ShiftTimeModel(Base):
     pair_type = Column(String, nullable=False)
 
     __table_args__ = (
-        UniqueConstraint('shift_number', 'pair_number', name='unique_shift_pair'),
+        UniqueConstraint("shift_number", "pair_number", name="unique_shift_pair"),
     )
 
 
 class DisciplineHoursModel(Base):
-    __tablename__ = 'discipline_hours'
+    __tablename__ = "discipline_hours"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    group_id = Column(Integer, ForeignKey('groups.id', ondelete='CASCADE'), nullable=False)
+    group_id = Column(Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
     discipline_name = Column(String, nullable=False)
     hours = Column(Integer, nullable=False)
 
@@ -699,12 +705,12 @@ class DisciplineHoursModel(Base):
     group = relationship("GroupModel", back_populates="discipline_hours")
 
     __table_args__ = (
-        UniqueConstraint('group_id', 'discipline_name', name='unique_group_discipline'),
+        UniqueConstraint("group_id", "discipline_name", name="unique_group_discipline"),
     )
 
 
 class MainDataModel(Base):
-    __tablename__ = 'main_data'
+    __tablename__ = "main_data"
 
     id = Column(Integer, primary_key=True, default=1)
     counter = Column(Integer, default=1)
@@ -721,7 +727,7 @@ def get_sqlite_db_path() -> str:
     """Получение пути к файлу SQLite базы данных"""
     data_path = get_data_file_path()
     if isinstance(data_path, Path):
-        db_path = data_path.with_suffix('.db')
+        db_path = data_path.with_suffix(".db")
     else:
         db_path = data_path.replace(".pickle", ".db")
     return str(db_path)
@@ -734,14 +740,14 @@ SessionLocal = None
 def init_db():
     """Инициализация SQLAlchemy базы данных"""
     global engine, SessionLocal
-    
+
     db_path = get_sqlite_db_path()
-    engine = create_engine(f'sqlite:///{db_path}', echo=False)
+    engine = create_engine(f"sqlite:///{db_path}", echo=False)
     SessionLocal = sessionmaker(bind=engine)
-    
+
     # Создаем все таблицы
     Base.metadata.create_all(bind=engine)
-    
+
     # Создаем начальную запись если ее нет
     session = SessionLocal()
     try:
@@ -764,7 +770,8 @@ def get_db_session():
 
 def save_data_sqlalchemy(data) -> None:
     """Сохранение данных с использованием SQLAlchemy + Pydantic схемы"""
-    print("Сохранение данных в SQLAlchemy базу")
+    logger.info("Сохранение данных в SQLAlchemy базу")
+    logger.debug(f"Сохраняем данные: counter={data.counter}, групп={len(data.discipline_hours)}, преподавателей={len(data.teachers)}")
 
     if SessionLocal is None:
         init_db()
@@ -867,8 +874,8 @@ def save_data_sqlalchemy(data) -> None:
                 shift_pair_model = GroupShiftPairModel(
                     group_id=group_model.id,
                     pair_number=pair_number,
-                    start_time=pair_time.start.strftime('%H:%M:%S'),
-                    end_time=pair_time.end.strftime('%H:%M:%S'),
+                    start_time=pair_time.start.strftime("%H:%M:%S"),
+                    end_time=pair_time.end.strftime("%H:%M:%S"),
                     pair_type=pair_time.pair_type
                 )
                 session.add(shift_pair_model)
@@ -885,27 +892,27 @@ def save_data_sqlalchemy(data) -> None:
                     session.add(discipline_model)
 
         # Сохраняем schedule_time_shift
-        for shift_name, shift_dict in [('schedule_time_shift_1', data.schedule_time_shift_1),
-                                       ('schedule_time_shift_2', data.schedule_time_shift_2),
-                                       ('schedule_time_shift_3', data.schedule_time_shift_3)]:
+        for shift_name, shift_dict in [("schedule_time_shift_1", data.schedule_time_shift_1),
+                                       ("schedule_time_shift_2", data.schedule_time_shift_2),
+                                       ("schedule_time_shift_3", data.schedule_time_shift_3)]:
             if hasattr(data, shift_name) and shift_dict:
-                shift_number = int(shift_name.split('_')[-1])
+                shift_number = int(shift_name.split("_")[-1])
                 for pair_number, pair_time in shift_dict.items():
                     time_shift_model = ShiftTimeModel(
                         shift_number=shift_number,
                         pair_number=pair_number,
-                        start_time=pair_time.start.strftime('%H:%M:%S'),
-                        end_time=pair_time.end.strftime('%H:%M:%S'),
+                        start_time=pair_time.start.strftime("%H:%M:%S"),
+                        end_time=pair_time.end.strftime("%H:%M:%S"),
                         pair_type=pair_time.pair_type
                     )
                     session.add(time_shift_model)
 
         session.commit()
-        print("Данные успешно сохранены")
+        logger.info(f"Данные успешно сохранены: групп={len(data.discipline_hours)}, преподавателей={len(data.teachers)}, аудиторий={len(data.rooms)}")
 
     except Exception as e:
         session.rollback()
-        print(f"Ошибка при сохранении данных: {e}")
+        logger.error(f"Ошибка при сохранении данных: {e}")
         raise
     finally:
         session.close()
@@ -913,7 +920,7 @@ def save_data_sqlalchemy(data) -> None:
 
 def load_data_sqlalchemy() -> Data:
     """Загрузка данных с использованием SQLAlchemy + Pydantic схемы"""
-    print("Загрузка данных из SQLAlchemy базы")
+    logger.info("Загрузка данных из SQLAlchemy базы")
 
     if SessionLocal is None:
         init_db()
@@ -923,25 +930,31 @@ def load_data_sqlalchemy() -> Data:
         # Проверяем, есть ли данные
         teacher_count = session.query(TeacherModel).count()
         if teacher_count == 0:
-            print("База данных пуста, создаем пример данных")
+            logger.info("База данных пуста, создаем пример данных")
             session.close()
             example_data = ExampleData()
             save_data_sqlalchemy(example_data)
             return example_data
 
+        logger.debug(f"В базе найдено преподавателей: {teacher_count}")
+        
         # Создаем объект данных
         data = EmptyData()
 
         # Загружаем счетчик
         main_data = session.query(MainDataModel).filter_by(id=1).first()
         data.counter = main_data.counter if main_data else 1
+        logger.debug(f"Загружен счетчик запусков: {data.counter}")
 
         # Загружаем преподавателей и их расписание
         teacher_models = session.query(TeacherModel).all()
         data.teachers = {}
         data.teachers_work_hours = {}
-
-        for teacher_model in teacher_models:
+        
+        logger.debug(f"Загрузка {len(teacher_models)} преподавателей...")
+        
+        for i, teacher_model in enumerate(teacher_models, 1):
+            logger.debug(f"Загрузка преподавателя {i}/{len(teacher_models)}: {teacher_model.name}")
             teacher_schema = TeacherSchema(
                 name=teacher_model.name,
                 disciplines=set(json.loads(teacher_model.disciplines)),
@@ -966,16 +979,16 @@ def load_data_sqlalchemy() -> Data:
             for schedule_model in schedule_models:
                 # Проверяем, что день существует в расписании
                 if schedule_model.day not in teachers_schedule.schedule_for_days:
-                    print(f"Предупреждение: неизвестный день '{schedule_model.day}' для преподавателя {teacher.name}")
+                    logger.warning(f"Неизвестный день '{schedule_model.day}' для преподавателя {teacher.name}")
                     continue
-                
+
                 # Инициализируем день если нужно
                 if teachers_schedule.schedule_for_days[schedule_model.day] is None:
                     teachers_schedule.schedule_for_days[schedule_model.day] = [False] * 6
 
                 # Проверяем границы номера пары
                 if not 1 <= schedule_model.pair_number <= 6:
-                    print(f"Предупреждение: некорректный номер пары {schedule_model.pair_number} для преподавателя {teacher.name}")
+                    logger.warning(f"Некорректный номер пары {schedule_model.pair_number} для преподавателя {teacher.name}")
                     continue
 
                 # Устанавливаем значение
@@ -997,17 +1010,17 @@ def load_data_sqlalchemy() -> Data:
             for schedule_model in schedule_models:
                 # Проверяем, что день существует в расписании
                 if schedule_model.day not in room_schedule.schedule_for_days:
-                    print(f"Предупреждение: неизвестный день '{schedule_model.day}' для аудитории {room_model.name}")
+                    logger.warning(f"Неизвестный день '{schedule_model.day}' для аудитории {room_model.name}")
                     continue
-                
+
                 if room_schedule.schedule_for_days[schedule_model.day] is None:
                     room_schedule.schedule_for_days[schedule_model.day] = [False] * 6
-                
+
                 # Проверяем границы номера пары
                 if not 1 <= schedule_model.pair_number <= 6:
-                    print(f"Предупреждение: некорректный номер пары {schedule_model.pair_number} для аудитории {room_model.name}")
+                    logger.warning(f"Некорректный номер пары {schedule_model.pair_number} для аудитории {room_model.name}")
                     continue
-                
+
                 room_schedule.schedule_for_days[schedule_model.day][
                     schedule_model.pair_number - 1] = not schedule_model.is_available
 
@@ -1059,11 +1072,11 @@ def load_data_sqlalchemy() -> Data:
             elif shift_model.shift_number == 3:
                 data.schedule_time_shift_3[shift_model.pair_number] = pair_time
 
-        print("Данные успешно загружены")
+        logger.info(f"Данные успешно загружены: групп={len(data.discipline_hours)}, преподавателей={len(data.teachers)}, аудиторий={len(data.rooms)}")
         return data
 
     except Exception as e:
-        print(f"Ошибка при загрузке данных: {e}")
+        logger.error(f"Ошибка при загрузке данных: {e}")
         raise
     finally:
         session.close()
@@ -1074,11 +1087,13 @@ def load_data_sqlalchemy() -> Data:
 
 def save_data(data) -> None:
     """Сохранение данных с использованием SQLAlchemy"""
+    logger.debug("Вызов save_data")
     save_data_sqlalchemy(data)
 
 
 def load_data() -> Data:
     """Загрузка данных с использованием SQLAlchemy"""
+    logger.debug("Вызов load_data")
     return load_data_sqlalchemy()
 
 
@@ -1181,7 +1196,7 @@ def convert_data_to_schema(data: Data) -> DataSchema:
         num: convert_pair_time_to_schema(pair_time)
         for num, pair_time in data.schedule_time_shift_3.items()
     }
-    
+
     # Конвертируем groups_shift
     groups_shift = {}
     for group, shift in data.groups_shift.items():
@@ -1189,32 +1204,32 @@ def convert_data_to_schema(data: Data) -> DataSchema:
             num: convert_pair_time_to_schema(pair_time)
             for num, pair_time in shift.items()
         }
-    
+
     # Конвертируем teachers
     teachers = {}
     for teacher_name, teacher_list in data.teachers.items():
         teachers[teacher_name] = [
             convert_teacher_to_schema(teacher) for teacher in teacher_list
         ]
-    
+
     # Конвертируем teachers_work_hours
     teachers_work_hours = {
         teacher_name: convert_teachers_schedule_to_schema(schedule)
         for teacher_name, schedule in data.teachers_work_hours.items()
     }
-    
+
     # Конвертируем rooms
     rooms = {
         room_name: convert_room_to_schema(room)
         for room_name, room in data.rooms.items()
     }
-    
+
     # Конвертируем rooms_availability_hours
     rooms_availability_hours = {
         room_name: convert_room_schedule_to_schema(schedule)
         for room_name, schedule in data.rooms_availability_hours.items()
     }
-    
+
     return DataSchema(
         counter=data.counter,
         days=data.days,
