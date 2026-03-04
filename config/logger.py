@@ -11,6 +11,7 @@
 Использует ротацию логов для управления размером файлов.
 """
 
+import contextlib
 import locale
 import logging
 import logging.handlers
@@ -18,12 +19,10 @@ from pathlib import Path
 
 # Устанавливаем локаль для правильной работы с кириллицей
 try:
-    locale.setlocale(locale.LC_ALL, 'Russian_Russia.1251')
+    locale.setlocale(locale.LC_ALL, "Russian_Russia.1251")
 except:
-    try:
-        locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
-    except:
-        pass
+    with contextlib.suppress(BaseException):
+        locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
 
 from .settings import LOG_LEVELS
 
@@ -31,11 +30,11 @@ from .settings import LOG_LEVELS
 def setup_logger(name: str = "schpy", log_level: str = None) -> logging.Logger:
     """
     Настройка логгера с ротацией файлов и консольным выводом.
-    
+
     Args:
         name: Имя логгера
         log_level: Уровень логирования (если None, используется из настроек)
-    
+
     Returns:
         Настроенный логгер
     """
@@ -50,7 +49,7 @@ def setup_logger(name: str = "schpy", log_level: str = None) -> logging.Logger:
     # Настройка формата логов
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     # Создаем логгер
@@ -63,9 +62,9 @@ def setup_logger(name: str = "schpy", log_level: str = None) -> logging.Logger:
     # Обработчик для файла с ротацией (макс. 10MB, хранить 5 файлов)
     file_handler = logging.handlers.RotatingFileHandler(
         log_dir / f"{name}.log",
-        maxBytes=10*1024*1024,  # 10MB
+        maxBytes=10 * 1024 * 1024,  # 10MB
         backupCount=5,
-        encoding="utf-8-sig"  # Используем UTF-8 с BOM для лучшей совместимости
+        encoding="utf-8-sig",  # Используем UTF-8 с BOM для лучшей совместимости
     )
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
@@ -73,9 +72,9 @@ def setup_logger(name: str = "schpy", log_level: str = None) -> logging.Logger:
     # Обработчик для ошибок в отдельный файл
     error_handler = logging.handlers.RotatingFileHandler(
         log_dir / f"{name}_errors.log",
-        maxBytes=10*1024*1024,
+        maxBytes=10 * 1024 * 1024,
         backupCount=3,
-        encoding="utf-8-sig"
+        encoding="utf-8-sig",
     )
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(formatter)
@@ -85,8 +84,7 @@ def setup_logger(name: str = "schpy", log_level: str = None) -> logging.Logger:
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
     console_formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s: %(message)s",
-        datefmt="%H:%M:%S"
+        "%(asctime)s - %(levelname)s: %(message)s", datefmt="%H:%M:%S"
     )
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
@@ -101,10 +99,10 @@ logger = setup_logger("schpy")
 def get_logger(name: str = None) -> logging.Logger:
     """
     Получить логгер для конкретного модуля.
-    
+
     Args:
         name: Имя модуля (если None, возвращает основной логгер)
-    
+
     Returns:
         Логгер для модуля
     """

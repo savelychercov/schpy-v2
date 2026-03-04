@@ -110,7 +110,8 @@ def get_schedule_for(
                     filter(lambda pair: pair.date == value, pairs_list[group])
                 )
             case _:
-                raise ValueError(f"Неизвестный ключ '{key}'")
+                msg = f"Неизвестный ключ '{key}'"
+                raise ValueError(msg)
     return pairs_list
 
 
@@ -142,11 +143,9 @@ def choose_a_pair_time(
                 continue
             # Создаем объект пары
             pair_time_schema = PairTimeSchema(
-                start=pair_time.start,
-                end=pair_time.end,
-                pair_type=pair_time.pair_type
+                start=pair_time.start, end=pair_time.end, pair_type=pair_time.pair_type
             )
-            pair = PairSchema(
+            return PairSchema(
                 date="2024-XX-XX",  # (Можно изменить на даты текущей недели после составления)
                 day=day,
                 number=number,
@@ -157,10 +156,8 @@ def choose_a_pair_time(
                 teacher=teacher.name,
                 classroom=None,
             )
-            return pair  # Возвращаем объект пары
-    raise ScheduleError(
-        "Невозможно найти свободное время", discipline=discipline, group=group
-    )
+    msg = "Невозможно найти свободное время"
+    raise ScheduleError(msg, discipline=discipline, group=group)
 
 
 def distribute_pairs(
@@ -170,7 +167,7 @@ def distribute_pairs(
     errors = []
     remaining_hours = data.discipline_hours
 
-    for group in data.groups_shift.keys():
+    for group in data.groups_shift:
         full_schedule[group] = []  # Инициализируем список для каждой группы
         # Итерируемся по дисциплинам
         if group not in remaining_hours:
@@ -203,10 +200,12 @@ def distribute_pairs(
     return full_schedule, errors  # Возвращаем полное расписание
 
 
-def distribute_classrooms(raw_sch: dict, data: DataSchema) -> dict[str, list[PairSchema]]:
+def distribute_classrooms(
+    raw_sch: dict, data: DataSchema
+) -> dict[str, list[PairSchema]]:
     raw_sch = raw_sch.copy()
     available_rooms: dict[str, RoomScheduleSchema] = data.rooms_availability_hours
-    for group, list_of_pairs in raw_sch.items():
+    for list_of_pairs in raw_sch.values():
         for pair in list_of_pairs:
             if pair.classroom is not None:
                 continue
@@ -224,34 +223,37 @@ def distribute_classrooms(raw_sch: dict, data: DataSchema) -> dict[str, list[Pai
                 ]
             for room, room_schedule in _available_rooms_list:
                 day_schedule = room_schedule.schedule_for_days[pair.day]
-                if not day_schedule[
-                    room_schedule.get_pair_number(pair.pair_time) - 1
-                ]:
+                if not day_schedule[room_schedule.get_pair_number(pair.pair_time) - 1]:
                     # Если пара свободна
                     pair.classroom = room
-                    day_schedule[
-                        room_schedule.get_pair_number(pair.pair_time) - 1
-                    ] = True
+                    day_schedule[room_schedule.get_pair_number(pair.pair_time) - 1] = (
+                        True
+                    )
                     break
     return raw_sch
 
 
 def make_full_schedule(data: DataSchema) -> Schedule:
     import time
+
     start_time = time.time()
     logger.info("Начало генерации полного расписания")
-    logger.debug(f"Входные данные: групп={len(data.discipline_hours)}, преподавателей={len(data.teachers)}")
-    
+    logger.debug(
+        f"Входные данные: групп={len(data.discipline_hours)}, преподавателей={len(data.teachers)}"
+    )
+
     data = copy.deepcopy(data)
     full_schedule, errors = distribute_pairs(data)
     logger.info(f"Распределение пар завершено, ошибок: {len(errors)}")
-    
+
     full_schedule = distribute_classrooms(full_schedule, data)
     logger.info("Распределение аудиторий завершено")
-    
+
     full_schedule = sorted_pairs(full_schedule)
     elapsed_time = time.time() - start_time
-    logger.info(f"Генерация расписания завершена, групп: {len(full_schedule)}, время: {elapsed_time:.2f}с")
+    logger.info(
+        f"Генерация расписания завершена, групп: {len(full_schedule)}, время: {elapsed_time:.2f}с"
+    )
     return Schedule(pairs=full_schedule, errors=errors, remaining_data=data)
 
 

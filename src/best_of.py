@@ -95,9 +95,9 @@ def shuffle_data(data_obj: db.Data) -> db.Data:
 
 
 def get_top(seeds_rating_dict: dict, count: int) -> dict:
-    seeds_rating_dict = {
-        k: v for k, v in sorted(seeds_rating_dict.items(), key=lambda item: item[1])
-    }
+    seeds_rating_dict = dict(
+        sorted(seeds_rating_dict.items(), key=lambda item: item[1])
+    )
     if len(seeds_rating_dict) < count:
         return seeds_rating_dict
     return dict(list(seeds_rating_dict.items())[-count:][::-1])
@@ -111,8 +111,8 @@ def get_top(seeds_rating_dict: dict, count: int) -> dict:
 
 def count_unissued_hours(remaining_data: db.Data) -> int:
     count = 0
-    for group, discipline_hours in remaining_data.discipline_hours.items():
-        for discipline, hours in discipline_hours.items():
+    for discipline_hours in remaining_data.discipline_hours.values():
+        for hours in discipline_hours.values():
             count += hours
     return count
 
@@ -124,7 +124,7 @@ def count_teachers_gaps(original_data: db.Data, remaining_data: db.Data) -> int:
             chosen_pairs = []
             first = remaining_data.teachers_work_hours[teacher].schedule_for_days[day]
             second = teachers_schedule.schedule_for_days[day]
-            for n, (b1, b2) in enumerate(zip(first, second)):
+            for n, (b1, b2) in enumerate(zip(first, second, strict=False)):
                 if not b1 and b2:
                     chosen_pairs.append(n)
             if not chosen_pairs:
@@ -158,13 +158,13 @@ def count_offline_pairs_gaps(pairs: dict[str, list[db.Pair]], data_obj: db.Data)
 
 def count_overworked_teachers(pairs: dict[str, list[db.Pair]]) -> int:
     count_hours_for_teachers = {}
-    for group, list_of_pairs in pairs.items():
+    for list_of_pairs in pairs.values():
         for pair in list_of_pairs:
             if pair.teacher not in count_hours_for_teachers:
                 count_hours_for_teachers[pair.teacher] = 0
             count_hours_for_teachers[pair.teacher] += 2
     count = 0
-    for teacher, count_hours in count_hours_for_teachers.items():
+    for count_hours in count_hours_for_teachers.values():
         if count_hours > max_working_hours_for_teacher:
             count += 1
     return count
@@ -270,8 +270,16 @@ if __name__ == "__main__":
 
     logger.info(f"Лучшее расписание: {best_rating}")
     schedule_maker.print_schedule(best_schedule_obj.pairs)
-    logger.info(f"Teachers gaps: {count_teachers_gaps(best_data, best_schedule_obj.remaining_data)}")
-    logger.info(f"Offline pairs gaps: {count_offline_pairs_gaps(best_schedule_obj.pairs, best_data)}")
-    logger.info(f"Overworked teachers: {count_overworked_teachers(best_schedule_obj.pairs)}")
-    logger.info(f"Unissued hours: {count_unissued_hours(best_schedule_obj.remaining_data)}")
+    logger.info(
+        f"Teachers gaps: {count_teachers_gaps(best_data, best_schedule_obj.remaining_data)}"
+    )
+    logger.info(
+        f"Offline pairs gaps: {count_offline_pairs_gaps(best_schedule_obj.pairs, best_data)}"
+    )
+    logger.info(
+        f"Overworked teachers: {count_overworked_teachers(best_schedule_obj.pairs)}"
+    )
+    logger.info(
+        f"Unissued hours: {count_unissued_hours(best_schedule_obj.remaining_data)}"
+    )
     logger.info("Оптимизация расписания завершена")

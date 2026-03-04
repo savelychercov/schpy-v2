@@ -216,10 +216,8 @@ class ScheduleGeneratorDialog(QDialog):
             self.progress_bar.setValue(int(self.worker_thread.progress_value))
             remaining_time = self.worker_thread.remaining_time
             self.remaining_time_label.setText(
-
-                    f"Осталось времени: {str(round(remaining_time // 59)) + 'м, ' if remaining_time >= 60 else ''}"
-                    f"{round(remaining_time % 59)!s}с."
-
+                f"Осталось времени: {str(round(remaining_time // 59)) + 'м, ' if remaining_time >= 60 else ''}"
+                f"{round(remaining_time % 59)!s}с."
             )
 
     def update_number_label(self):
@@ -345,7 +343,7 @@ class InputDataDialog(QDialog):
             db.save_data(self.data)
             logger.info("Данные автоматически сохранены при закрытии диалога")
         except Exception as e:
-            logger.error(f"Ошибка при автоматическом сохранении: {e}")
+            logger.exception(f"Ошибка при автоматическом сохранении: {e}")
         event.accept()
 
     def load_test_data(self):
@@ -421,7 +419,7 @@ class InputDataDialog(QDialog):
         num_pairs = len(self.data.teachers_schedule_time)
         days_of_week = list(self.data.days)
 
-        for col, day in enumerate(days_of_week, start=1):
+        for col, _day in enumerate(days_of_week, start=1):
             day_schedule = [False] * num_pairs
 
             cell_widget = QWidget()
@@ -546,13 +544,13 @@ class InputDataDialog(QDialog):
         self.data_table.setEditTriggers(QTableWidget.DoubleClicked)
         self.data_table.resizeColumnsToContents()
 
-    def _setup_schedule_table(self, schedule_data):
+    def _setup_schedule_table(self, schedule_data) -> None:
         days_of_week = list(self.data.days)
         num_pairs = len(self.data.teachers_schedule_time)
 
         # Устанавливаем столбцы: один для имени, остальные для расписания по дням
         self.data_table.setColumnCount(1 + len(days_of_week))
-        headers = ["Имя"] + days_of_week
+        headers = ["Имя", *days_of_week]
         self.data_table.setHorizontalHeaderLabels(headers)
 
         for row, (name, schedule) in enumerate(schedule_data.items()):
@@ -575,7 +573,7 @@ class InputDataDialog(QDialog):
                 cell_widget.setLayout(cell_layout)
                 self.data_table.setCellWidget(row, col, cell_widget)
 
-    def _save_schedule_changes(self, schedule_data):
+    def _save_schedule_changes(self, schedule_data) -> None:
         for row in range(self.data_table.rowCount()):
             name = self.data_table.item(row, 0).text()
 
@@ -598,9 +596,7 @@ class InputDataDialog(QDialog):
                     *list(updated_schedule.values())
                 )
             elif self.current_variable == "rooms_availability_hours":
-                schedule_data[name] = db.RoomSchedule(
-                    *list(updated_schedule.values())
-                )
+                schedule_data[name] = db.RoomSchedule(*list(updated_schedule.values()))
 
     def save_changes(self):
         if self.current_variable is None:
@@ -632,7 +628,8 @@ class InputDataDialog(QDialog):
                         elif shift == 3:
                             schedule = self.data.schedule_time_shift_3
                         else:
-                            raise ValueError("Неверный номер смены")
+                            msg = "Неверный номер смены"
+                            raise ValueError(msg)
 
                         # Сохраняем расписание для группы
                         variable_data[group] = schedule
@@ -684,7 +681,7 @@ class InputDataDialog(QDialog):
                                 db.Teacher(name, disciplines, groups)
                             )
 
-                        if name not in self.data.teachers_work_hours.keys():
+                        if name not in self.data.teachers_work_hours:
                             self.data.teachers_work_hours[name] = db.TeachersSchedule()
                     except AttributeError:
                         row_data = [
@@ -694,8 +691,8 @@ class InputDataDialog(QDialog):
                         invalid_data.append(row_data)
 
                 data_copy = copy.deepcopy(self.data.teachers_work_hours)
-                for teacher in self.data.teachers_work_hours.keys():
-                    if teacher not in variable_data.keys():
+                for teacher in self.data.teachers_work_hours:
+                    if teacher not in variable_data:
                         data_copy.pop(teacher)
                 self.data.teachers_work_hours = data_copy
                 pp(variable_data)
@@ -707,7 +704,7 @@ class InputDataDialog(QDialog):
                         room = self.data_table.item(row, 0).text()
                         is_online = self.data_table.item(row, 1).text() == "Да"
                         variable_data[room] = db.Room(is_online)
-                        if room not in self.data.rooms_availability_hours.keys():
+                        if room not in self.data.rooms_availability_hours:
                             self.data.rooms_availability_hours[room] = db.RoomSchedule()
                     except AttributeError:
                         row_data = [
@@ -717,8 +714,8 @@ class InputDataDialog(QDialog):
                         invalid_data.append(row_data)
 
                 data_copy = copy.deepcopy(self.data.rooms_availability_hours)
-                for room in self.data.rooms_availability_hours.keys():
-                    if room not in variable_data.keys():
+                for room in self.data.rooms_availability_hours:
+                    if room not in variable_data:
                         data_copy.pop(room)
                 self.data.rooms_availability_hours = data_copy
 
@@ -858,7 +855,7 @@ class ErrorDialog(QDialog):
         main_layout.addLayout(right_layout)
 
     def display_error_info(self, current):
-        def pair_text(count):
+        def pair_text(count) -> str:
             if count % 10 == 1:
                 return "пара"
             if count % 10 in [2, 3, 4]:
@@ -1061,13 +1058,16 @@ class MainWindow(QMainWindow):
 
     def generate_schedule(self):
         import time
+
         start_time = time.time()
         logger.info("Генерация расписания")
         sch = schedule_maker.make_full_schedule(self.data)
         self.current_schedule = sch
         self.errors = sch.errors
         elapsed_time = time.time() - start_time
-        logger.info(f"Расписание сгенерировано, ошибок: {len(sch.errors)}, время: {elapsed_time:.2f}с")
+        logger.info(
+            f"Расписание сгенерировано, ошибок: {len(sch.errors)}, время: {elapsed_time:.2f}с"
+        )
         self.remaining_data = sch.remaining_data
         rating = {
             "rate": best_of.rate_schedule(sch.pairs, self.data, sch.remaining_data)
@@ -1095,6 +1095,7 @@ class MainWindow(QMainWindow):
 
     def export_schedule(self):
         logger.info("Начало экспорта расписания в Excel")
+
         class ExportException(Exception):
             pass
 
@@ -1103,7 +1104,8 @@ class MainWindow(QMainWindow):
             column_count = self.table_widget.columnCount()
 
             if self.current_schedule is None:
-                raise ExportException("Расписание не сформировано")
+                msg = "Расписание не сформировано"
+                raise ExportException(msg)
 
             file_name = f"ExportSchedule{int(self.rating['rate'])}{datetime.datetime.now().strftime('%H%M%S')}.xlsx"
             logger.info(f"Создание файла: {file_name}")
@@ -1197,19 +1199,20 @@ class MainWindow(QMainWindow):
 
             if resp == QMessageBox.Ok:
                 import os
-                logger.info(f"Открытие файла: {file_name}")
+
+                logger.info("Открытие файла: %s", file_name)
                 os.startfile(file_name)
             else:
                 logger.info("Файл не открыт по выбору пользователя")
         except ExportException as e:
-            logger.warning(f"Ошибка экспорта: {e}")
+            logger.warning("Ошибка экспорта: %s", e)
             QMessageBox.warning(
                 self, "Ошибка", "Сгенерируйте расписание перед выгрузкой"
             )
         except Exception as e:
-            logger.error(f"Ошибка при экспорте расписания: {e}")
+            logger.exception("Ошибка при экспорте расписания")
             QMessageBox.warning(self, "Ошибка", str(e))
-            raise e
+            raise
 
     def sort_by(self):
         if self.current_cell == "all":
@@ -1258,13 +1261,14 @@ class MainWindow(QMainWindow):
     def handle_generator_result(
         self, result: schedule_maker.Schedule, rating: dict[str, int]
     ):
-        logger.info(f"Получен результат генерации, рейтинг: {rating['rate']}")
+        logger.info("Получен результат генерации, рейтинг: %s", rating["rate"])
         if self.rating is not None and self.rating["rate"] > rating["rate"]:
             logger.warning("Новое расписание хуже предыдущего")
             resp = QMessageBox.question(
                 self,
                 "Внимание",
-                f"Новое расписание получилось хуже предыдущего (Рейтинг {rating['rate']})\nПрименить новое расписание?",
+                "Новое расписание получилось хуже предыдущего (Рейтинг %s)\nПрименить новое расписание?"
+                % rating["rate"],
                 buttons=QMessageBox.Ok | QMessageBox.Cancel,
             )
             if resp == QMessageBox.Cancel:
@@ -1282,18 +1286,24 @@ class MainWindow(QMainWindow):
 
 
 def global_exception_handler(exctype, value, tb: traceback):  # noqa
-    logger.error(f"Произошла необработанная ошибка: {value}")
+    logger.error("Произошла необработанная ошибка: %s", value)
     # Сохраняем в старый файл для совместимости
     with open("../error_log.txt", "a", encoding="utf-8") as f:
         f.write(
-            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Произошла не обработанная ошибка: {value}\n\n"
+            "%s Произошла не обработанная ошибка: %s\n\n"
+            % (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), value)
         )
-    if hasattr(MainWindow, "_instance") and MainWindow._instance is not None and hasattr(MainWindow._instance, "data") and MainWindow._instance.data:
+    if (
+        hasattr(MainWindow, "_instance")
+        and MainWindow._instance is not None
+        and hasattr(MainWindow._instance, "data")
+        and MainWindow._instance.data
+    ):
         try:
             db.save_data(MainWindow._instance.data)
             logger.info("Данные автоматически сохранены после ошибки")
         except Exception as save_error:
-            logger.error(f"Не удалось сохранить данные после ошибки: {save_error}")
+            logger.exception(f"Не удалось сохранить данные после ошибки: {save_error}")
     sys.__excepthook__(exctype, value, traceback)
     sys.exit(1)
 

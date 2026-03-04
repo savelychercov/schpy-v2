@@ -16,11 +16,9 @@ LOG_CONFIG = {
     "formatters": {
         "standard": {
             "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            "datefmt": "%Y-%m-%d %H:%M:%S"
+            "datefmt": "%Y-%m-%d %H:%M:%S",
         },
-        "console": {
-            "format": "%(levelname)s: %(message)s"
-        }
+        "console": {"format": "%(levelname)s: %(message)s"},
     },
     "handlers": {
         "file": {
@@ -28,62 +26,59 @@ LOG_CONFIG = {
             "level": "DEBUG",
             "formatter": "standard",
             "filename": str(LOGS_DIR / "schpy.log"),
-            "maxBytes": 10*1024*1024,  # 10MB
+            "maxBytes": 10 * 1024 * 1024,  # 10MB
             "backupCount": 5,
-            "encoding": "utf-8"
+            "encoding": "utf-8",
         },
         "error_file": {
             "class": "logging.handlers.RotatingFileHandler",
             "level": "ERROR",
             "formatter": "standard",
             "filename": str(LOGS_DIR / "schpy_errors.log"),
-            "maxBytes": 10*1024*1024,
+            "maxBytes": 10 * 1024 * 1024,
             "backupCount": 3,
-            "encoding": "utf-8"
+            "encoding": "utf-8",
         },
         "console": {
             "class": "logging.StreamHandler",
             "level": "INFO",
             "formatter": "console",
-            "stream": "ext://sys.stdout"
-        }
+            "stream": "ext://sys.stdout",
+        },
     },
     "loggers": {
         "schpy": {
             "handlers": ["file", "error_file", "console"],
             "level": "DEBUG",
-            "propagate": False
+            "propagate": False,
         },
         "schpy.db": {
             "handlers": ["file", "error_file", "console"],
             "level": "INFO",
-            "propagate": False
+            "propagate": False,
         },
         "schpy.window": {
             "handlers": ["file", "error_file", "console"],
             "level": "INFO",
-            "propagate": False
+            "propagate": False,
         },
         "schpy.schedule_maker": {
             "handlers": ["file", "error_file", "console"],
             "level": "INFO",
-            "propagate": False
+            "propagate": False,
         },
         "schpy.best_of": {
             "handlers": ["file", "error_file", "console"],
             "level": "INFO",
-            "propagate": False
+            "propagate": False,
         },
         "schpy.main": {
             "handlers": ["file", "error_file", "console"],
             "level": "INFO",
-            "propagate": False
-        }
+            "propagate": False,
+        },
     },
-    "root": {
-        "handlers": ["console"],
-        "level": "WARNING"
-    }
+    "root": {"handlers": ["console"], "level": "WARNING"},
 }
 
 # Уровни логирования для разных модулей (можно переопределить через переменные окружения)
@@ -93,7 +88,7 @@ LOG_LEVELS = {
     "window": os.getenv("SCHPY_WINDOW_LOG_LEVEL", "INFO"),
     "schedule_maker": os.getenv("SCHPY_SCHEDULE_MAKER_LOG_LEVEL", "INFO"),
     "best_of": os.getenv("SCHPY_BEST_OF_LOG_LEVEL", "INFO"),
-    "main": os.getenv("SCHPY_MAIN_LOG_LEVEL", "INFO")
+    "main": os.getenv("SCHPY_MAIN_LOG_LEVEL", "INFO"),
 }
 
 # Настройки производительности

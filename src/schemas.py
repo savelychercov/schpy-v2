@@ -19,6 +19,7 @@ from pydantic import BaseModel, field_validator
 
 class PairTimeSchema(BaseModel):
     """Временной интервал учебной пары с типом (онлайн/офлайн)"""
+
     start: time
     end: time
     pair_type: str
@@ -27,7 +28,8 @@ class PairTimeSchema(BaseModel):
     @classmethod
     def validate_end_time(cls, v, info):
         if "start" in info.data and v <= info.data["start"]:
-            raise ValueError("Время окончания должно быть позже времени начала")
+            msg = "Время окончания должно быть позже времени начала"
+            raise ValueError(msg)
         return v
 
     def get_str(self) -> str:
@@ -40,6 +42,7 @@ class PairTimeSchema(BaseModel):
 
 class PairSchema(BaseModel):
     """Учебная пара с полной информацией"""
+
     date: str
     day: str
     number: int
@@ -54,12 +57,14 @@ class PairSchema(BaseModel):
     @classmethod
     def validate_pair_number(cls, v):
         if not 1 <= v <= 6:
-            raise ValueError("Номер пары должен быть от 1 до 6")
+            msg = "Номер пары должен быть от 1 до 6"
+            raise ValueError(msg)
         return v
 
 
 class TeacherSchema(BaseModel):
     """Преподаватель с дисциплинами и группами"""
+
     name: str
     disciplines: set[str]
     groups: set[str]
@@ -67,6 +72,7 @@ class TeacherSchema(BaseModel):
 
 class TeachersScheduleSchema(BaseModel):
     """Расписание преподавателя на неделю"""
+
     Понедельник: list[bool]
     Вторник: list[bool]
     Среда: list[bool]
@@ -75,15 +81,26 @@ class TeachersScheduleSchema(BaseModel):
     Суббота: list[bool]
     Воскресенье: list[bool]
 
-    @field_validator("Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье")
+    @field_validator(
+        "Понедельник",
+        "Вторник",
+        "Среда",
+        "Четверг",
+        "Пятница",
+        "Суббота",
+        "Воскресенье",
+    )
     @classmethod
     def validate_day_schedule(cls, v):
         if len(v) < 6:
-            raise ValueError("Расписание на день должно содержать минимум 6 пар")
+            msg = "Расписание на день должно содержать минимум 6 пар"
+            raise ValueError(msg)
         # Обрезаем до 6 если больше
         return v[:6] if len(v) > 6 else v
 
-    def get_pair_number(self, pair_time: PairTimeSchema, schedule_time: dict[int, tuple]) -> int | None:
+    def get_pair_number(
+        self, pair_time: PairTimeSchema, schedule_time: dict[int, tuple]
+    ) -> int | None:
         """Получить номер пары по времени"""
         for number, (start, end) in schedule_time.items():
             if pair_time.start <= end and pair_time.end >= start:
@@ -100,19 +117,24 @@ class TeachersScheduleSchema(BaseModel):
         day_schedule = getattr(self, day)
         day_schedule[pair_number - 1] = True
 
-    def choose_pair(self, day: str, pair_time: PairTimeSchema, schedule_time: dict[int, tuple]) -> None:
+    def choose_pair(
+        self, day: str, pair_time: PairTimeSchema, schedule_time: dict[int, tuple]
+    ) -> None:
         """Выбрать время для пары"""
         pair_number = self.get_pair_number(pair_time, schedule_time)
         if pair_number is None:
-            raise ValueError(f"Невозможно выбрать время '{pair_time}'")
+            msg = f"Невозможно выбрать время '{pair_time}'"
+            raise ValueError(msg)
         day_schedule = getattr(self, day)
         if not day_schedule[pair_number - 1]:
-            raise ValueError(f"Время '{pair_time}' занято или недоступно")
+            msg = f"Время '{pair_time}' занято или недоступно"
+            raise ValueError(msg)
         self.take_pair(day, pair_number)
 
 
 class RoomScheduleSchema(BaseModel):
     """Расписание аудитории на неделю"""
+
     Понедельник: list[bool]
     Вторник: list[bool]
     Среда: list[bool]
@@ -121,15 +143,26 @@ class RoomScheduleSchema(BaseModel):
     Суббота: list[bool]
     Воскресенье: list[bool]
 
-    @field_validator("Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье")
+    @field_validator(
+        "Понедельник",
+        "Вторник",
+        "Среда",
+        "Четверг",
+        "Пятница",
+        "Суббота",
+        "Воскресенье",
+    )
     @classmethod
     def validate_day_schedule(cls, v):
         if len(v) < 6:
-            raise ValueError("Расписание на день должно содержать минимум 6 пар")
+            msg = "Расписание на день должно содержать минимум 6 пар"
+            raise ValueError(msg)
         # Обрезаем до 6 если больше
         return v[:6] if len(v) > 6 else v
 
-    def get_pair_number(self, pair_time: PairTimeSchema, schedule_time: dict[int, tuple]) -> int | None:
+    def get_pair_number(
+        self, pair_time: PairTimeSchema, schedule_time: dict[int, tuple]
+    ) -> int | None:
         """Получить номер пары по времени"""
         for number, (start, end) in schedule_time.items():
             if pair_time.start <= end and pair_time.end >= start:
@@ -139,11 +172,13 @@ class RoomScheduleSchema(BaseModel):
 
 class RoomSchema(BaseModel):
     """Тип аудитории"""
+
     is_online: bool = False
 
 
 class DataSchema(BaseModel):
     """Контейнер всех параметров расписания"""
+
     counter: int
     days: list[str]
     teachers_schedule_time: dict[int, tuple]
@@ -163,5 +198,6 @@ class DataSchema(BaseModel):
         """Валидация временных интервалов пар"""
         for number, (start, end) in v.items():
             if start >= end:
-                raise ValueError(f"Некорректный временной интервал для пары {number}")
+                msg = f"Некорректный временной интервал для пары {number}"
+                raise ValueError(msg)
         return v
