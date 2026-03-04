@@ -913,6 +913,7 @@ def load_data_sqlalchemy() -> Data:
         # Загружаем аудитории через Pydantic схемы
         room_models = session.query(RoomModel).all()
         data.rooms_availability_hours = {}
+        data.rooms = {}
         
         for room_model in room_models:
             # Конвертируем в Pydantic схему для валидации
@@ -920,6 +921,10 @@ def load_data_sqlalchemy() -> Data:
             
             room_schedule = RoomSchedule()
             data.rooms_availability_hours[room_model.name] = room_schedule
+            
+            # Создаем объект Room для data.rooms
+            room = Room(is_online=room_model.is_online)
+            data.rooms[room_model.name] = room
         
         # Загружаем расписание аудиторий через Pydantic схемы
         room_schedule_models = session.query(RoomScheduleModel).all()

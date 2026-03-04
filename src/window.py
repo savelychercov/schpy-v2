@@ -253,7 +253,7 @@ class ScheduleGeneratorDialog(QDialog):
 
 
 class InputDataDialog(QDialog):
-    def __init__(self):
+    def __init__(self, data=None):
         super().__init__(parent=None)
 
         with open(db.resource_path("../css/InputDataDialog.css")) as f:
@@ -318,6 +318,29 @@ class InputDataDialog(QDialog):
         self.layout.addLayout(self.button_layout)
 
         self.current_variable = None
+        
+        # Use passed data or load from database
+        if data is not None:
+            self.data = data
+        else:
+            # Initialize data attribute - load from database or create empty data
+            if db.check_exists_data():
+                self.data = db.load_data()
+            else:
+                self.data = db.EmptyData()
+        
+        # Select the first item in the variable list
+        if self.variable_list.count() > 0:
+            self.variable_list.setCurrentRow(0)
+
+    def closeEvent(self, event):
+        # Auto-save data when dialog is closed
+        try:
+            db.save_data(self.data)
+            print("Данные автоматически сохранены при закрытии диалога")
+        except Exception as e:
+            print(f"Ошибка при автоматическом сохранении: {e}")
+        event.accept()
 
     def load_test_data(self):
         resp = QMessageBox.question(
@@ -429,13 +452,18 @@ class InputDataDialog(QDialog):
             row = 0
             for group, schedule in variable_data.items():
                 shift = None
-                # Определяем смену, исходя из расписания
-                if schedule == self.data.schedule_time_shift_1:
-                    shift = "1"
-                elif schedule == self.data.schedule_time_shift_2:
-                    shift = "2"
-                elif schedule == self.data.schedule_time_shift_3:
-                    shift = "3"
+                # Определяем смену, исходя из расписания по первой паре
+                if schedule and 1 in schedule:
+                    first_pair = schedule[1]
+                    if 1 in self.data.schedule_time_shift_1:
+                        if first_pair.start == self.data.schedule_time_shift_1[1].start:
+                            shift = "1"
+                    if 1 in self.data.schedule_time_shift_2:
+                        if first_pair.start == self.data.schedule_time_shift_2[1].start:
+                            shift = "2"
+                    if 1 in self.data.schedule_time_shift_3:
+                        if first_pair.start == self.data.schedule_time_shift_3[1].start:
+                            shift = "3"
 
                 self.data_table.insertRow(row)
                 self.data_table.setItem(row, 0, QTableWidgetItem(group))
@@ -1205,7 +1233,7 @@ class MainWindow(QMainWindow):
 
     def input_data(self):
         if not self.input_dialog:  # Создаем окно только если оно еще не создано
-            self.input_dialog = InputDataDialog()
+            self.input_dialog = InputDataDialog(self.data)
         self.input_dialog.show()
 
     def handle_generator_result(
