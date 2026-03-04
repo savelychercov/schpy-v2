@@ -44,23 +44,19 @@ import copy
 import random
 import time
 
-from config.logger import get_logger
 from config.constants import (
     MAX_WORKING_HOURS_FOR_TEACHER,
+    OFFLINE_PAIRS_GAPS_RATING_MODIFIER,
+    OVERWORKED_TEACHERS_RATING_MODIFIER,
+    TEACHERS_GAPS_RATING_MODIFIER,
     UNISSUED_HOURS_RATING_MODIFIER,
-    PairType,
     WORKWEEK_DAYS,
+    PairType,
 )
+from config.logger import get_logger
 from src import db, schedule_maker
 
 logger = get_logger("best_of")
-
-teachers_gaps_rating_modifier = 5
-offline_pairs_gaps_rating_modifier = 13
-owervorked_teachers_rating_modifier = 50
-
-
-
 
 # region Utils
 
@@ -179,16 +175,16 @@ def rate_schedule(
 ) -> float:
     rate = 100
     teachers_gaps_count = count_teachers_gaps(original_data, remaining_data)
-    rate = sub_percentage(rate, teachers_gaps_count * teachers_gaps_rating_modifier)
+    rate = sub_percentage(rate, teachers_gaps_count * TEACHERS_GAPS_RATING_MODIFIER)
     # logger.debug(f"after teachers_gaps_count {rate}")
 
     offline_pairs_gaps = count_offline_pairs_gaps(schedule, original_data)
-    rate = sub_percentage(rate, offline_pairs_gaps * offline_pairs_gaps_rating_modifier)
+    rate = sub_percentage(rate, offline_pairs_gaps * OFFLINE_PAIRS_GAPS_RATING_MODIFIER)
     # logger.debug(f"after offline_pairs_gaps {rate}")
 
     overworked_teachers = count_overworked_teachers(schedule)
     rate = sub_percentage(
-        rate, overworked_teachers * owervorked_teachers_rating_modifier
+        rate, overworked_teachers * OVERWORKED_TEACHERS_RATING_MODIFIER
     )
     # logger.debug(f"after overworked_teachers {rate}")
 

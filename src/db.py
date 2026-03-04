@@ -65,6 +65,17 @@ from config.logger import get_logger
 
 logger = get_logger("db")
 
+from config.constants import (
+    DAYS,
+    DB_FILE,
+    DB_PATH_NAME,
+    MAX_PAIR_NUMBER,
+    MIN_PAIR_NUMBER,
+    PAIRS_PER_DAY,
+    TEACHERS_SCHEDULE_TIME,
+    PairType,
+    RoomPrefix,
+)
 from src.schemas import (
     DataSchema,
     PairSchema,
@@ -73,20 +84,6 @@ from src.schemas import (
     RoomSchema,
     TeacherSchema,
     TeachersScheduleSchema,
-)
-
-from config.constants import (
-    PairType,
-    DayOfWeek,
-    RoomPrefix,
-    PAIRS_PER_DAY,
-    MAX_PAIR_NUMBER,
-    MIN_PAIR_NUMBER,
-    TEACHERS_SCHEDULE_TIME,
-    DAYS,
-    WORKWEEK_DAYS,
-    DB_FILE,
-    DB_PATH_NAME,
 )
 
 # region Classes
@@ -349,31 +346,31 @@ class ExampleData(Data):
             "П9022": self.schedule_time_shift_2,
             "П9021": self.schedule_time_shift_3,
         }
-        
+
         # Создаем правильное расписание для групп согласно вашим данным
         # П9024: пары 1, 2, 3 (08:00-09:00, 11:30-13:00, 13:10-14:40)
-        # П9022: пары 1, 2, 3 (08:00-09:00, 11:30-13:00, 13:10-14:40) 
+        # П9022: пары 1, 2, 3 (08:00-09:00, 11:30-13:00, 13:10-14:40)
         # П9021: пары 1, 2, 3 (11:50-12:50, 15:00-16:30, 16:40-18:10)
-        
+
         # Переопределяем расписание групп согласно вашим данным
         custom_schedule_1 = {
             1: PairTime(time(8, 0), time(9, 30), PairType.OFFLINE.value),  # Смена 1
             2: PairTime(time(11, 30), time(13, 0), PairType.OFFLINE.value),
             3: PairTime(time(13, 10), time(14, 40), PairType.OFFLINE.value),
         }
-        
+
         custom_schedule_2 = {
-            1: PairTime(time(8, 0), time(9, 0), PairType.OFFLINE.value),   # Смена 2
+            1: PairTime(time(8, 0), time(9, 0), PairType.OFFLINE.value),  # Смена 2
             2: PairTime(time(11, 30), time(13, 0), PairType.OFFLINE.value),
             3: PairTime(time(13, 10), time(14, 40), PairType.OFFLINE.value),
         }
-        
+
         custom_schedule_3 = {
             1: PairTime(time(11, 50), time(12, 50), PairType.ONLINE.value),  # Смена 3
             2: PairTime(time(15, 0), time(16, 30), PairType.OFFLINE.value),
             3: PairTime(time(16, 40), time(18, 10), PairType.OFFLINE.value),
         }
-        
+
         self.groups_shift = {
             "П9024": custom_schedule_1,
             "П9022": custom_schedule_2,
@@ -881,7 +878,9 @@ def save_data_sqlalchemy(data) -> None:
         # Сохраняем аудитории
         rooms_map = {}  # имя -> id
         for room_name, room_schedule in data.rooms_availability_hours.items():
-            is_online = room_name.startswith(RoomPrefix.DIGITAL.value)  # Д - онлайн аудитории
+            is_online = room_name.startswith(
+                RoomPrefix.DIGITAL.value
+            )  # Д - онлайн аудитории
 
             room_model = RoomModel(name=room_name, is_online=is_online)
             session.add(room_model)
@@ -904,26 +903,32 @@ def save_data_sqlalchemy(data) -> None:
         for group_name, shift_dict in data.groups_shift.items():
             # Определяем номер смены по расписанию группы
             shift_number = 1  # значение по умолчанию
-            
+
             # Проверяем по первой паре в расписании группы
             if shift_dict and 1 in shift_dict:
                 first_pair = shift_dict[1]
-                
+
                 # Сравниваем время начала первой пары с эталонными расписаниями
-                if (hasattr(data, 'schedule_time_shift_1') and 
-                    1 in data.schedule_time_shift_1 and
-                    first_pair.start == data.schedule_time_shift_1[1].start and
-                    first_pair.end == data.schedule_time_shift_1[1].end):
+                if (
+                    hasattr(data, "schedule_time_shift_1")
+                    and 1 in data.schedule_time_shift_1
+                    and first_pair.start == data.schedule_time_shift_1[1].start
+                    and first_pair.end == data.schedule_time_shift_1[1].end
+                ):
                     shift_number = 1
-                elif (hasattr(data, 'schedule_time_shift_2') and 
-                      1 in data.schedule_time_shift_2 and
-                      first_pair.start == data.schedule_time_shift_2[1].start and
-                      first_pair.end == data.schedule_time_shift_2[1].end):
+                elif (
+                    hasattr(data, "schedule_time_shift_2")
+                    and 1 in data.schedule_time_shift_2
+                    and first_pair.start == data.schedule_time_shift_2[1].start
+                    and first_pair.end == data.schedule_time_shift_2[1].end
+                ):
                     shift_number = 2
-                elif (hasattr(data, 'schedule_time_shift_3') and 
-                      1 in data.schedule_time_shift_3 and
-                      first_pair.start == data.schedule_time_shift_3[1].start and
-                      first_pair.end == data.schedule_time_shift_3[1].end):
+                elif (
+                    hasattr(data, "schedule_time_shift_3")
+                    and 1 in data.schedule_time_shift_3
+                    and first_pair.start == data.schedule_time_shift_3[1].start
+                    and first_pair.end == data.schedule_time_shift_3[1].end
+                ):
                     shift_number = 3
 
             group_model = GroupModel(name=group_name, shift_number=shift_number)
@@ -1097,7 +1102,9 @@ def load_data_sqlalchemy() -> Data:
                     continue
 
                 if room_schedule.schedule_for_days[schedule_model.day] is None:
-                    room_schedule.schedule_for_days[schedule_model.day] = [False] * PAIRS_PER_DAY
+                    room_schedule.schedule_for_days[schedule_model.day] = [
+                        False
+                    ] * PAIRS_PER_DAY
 
                 # Проверяем границы номера пары
                 if not MIN_PAIR_NUMBER <= schedule_model.pair_number <= MAX_PAIR_NUMBER:
@@ -1119,8 +1126,10 @@ def load_data_sqlalchemy() -> Data:
         data.discipline_hours = {}
 
         for group_model in group_models:
-            print(f"Загрузка группы: {group_model.name}, shift_number из БД: {group_model.shift_number}")
-            
+            print(
+                f"Загрузка группы: {group_model.name}, shift_number из БД: {group_model.shift_number}"
+            )
+
             # Загружаем расписание пар для группы
             shift_pairs = {}
             pair_models = (
@@ -1136,8 +1145,10 @@ def load_data_sqlalchemy() -> Data:
                 )
                 shift_pairs[pair_model.pair_number] = pair_time
                 if pair_model.pair_number == 1:
-                    print(f"  Первая пара: {pair_model.start_time} - {pair_model.end_time}")
-            
+                    print(
+                        f"  Первая пара: {pair_model.start_time} - {pair_model.end_time}"
+                    )
+
             data.groups_shift[group_model.name] = shift_pairs
 
             # Загружаем часы дисциплин

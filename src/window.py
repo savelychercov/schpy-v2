@@ -60,25 +60,23 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from config.logger import get_logger
 from config.constants import (
     DEFAULT_ITERATIONS,
-    MIN_ITERATIONS,
+    EXCEL_COLUMN_WIDTH_PADDING,
+    HELP_LABEL_WIDTH,
     MAX_ITERATIONS,
-    WINDOW_WIDTH,
+    MIN_ITERATIONS,
     WINDOW_HEIGHT,
+    WINDOW_WIDTH,
     WINDOW_X,
     WINDOW_Y,
-    HELP_LABEL_WIDTH,
-    EXCEL_COLUMN_WIDTH_PADDING,
-    RoomPrefix,
 )
+from config.logger import get_logger
 from config.messages import (
-    QMessageBoxTitles,
-    QMessageBoxMessages,
-    QMessageBoxButtonTexts,
     QMessageBoxDataErrors,
     QMessageBoxHelpTexts,
+    QMessageBoxMessages,
+    QMessageBoxTitles,
 )
 from src import best_of, db, schedule_maker
 
@@ -261,7 +259,11 @@ class ScheduleGeneratorDialog(QDialog):
 
     def show_help(self):
         # Отображение справки
-        QMessageBox.information(self, QMessageBoxTitles.HELP.value, QMessageBoxMessages.SCHEDULE_GENERATOR_HELP.value)
+        QMessageBox.information(
+            self,
+            QMessageBoxTitles.HELP.value,
+            QMessageBoxMessages.SCHEDULE_GENERATOR_HELP.value,
+        )
 
 
 class InputDataDialog(QDialog):
@@ -465,24 +467,30 @@ class InputDataDialog(QDialog):
                 # Определяем смену, исходя из расписания по первой паре
                 if schedule and 1 in schedule:
                     first_pair = schedule[1]
-                    
+
                     # Проверяем все смены независимо друг от друга
                     if 1 in self.data.schedule_time_shift_1:
                         shift1_first = self.data.schedule_time_shift_1[1]
-                        if (first_pair.start == shift1_first.start and 
-                            first_pair.end == shift1_first.end):
+                        if (
+                            first_pair.start == shift1_first.start
+                            and first_pair.end == shift1_first.end
+                        ):
                             shift = "1"
-                    
+
                     if 1 in self.data.schedule_time_shift_2:
                         shift2_first = self.data.schedule_time_shift_2[1]
-                        if (first_pair.start == shift2_first.start and 
-                            first_pair.end == shift2_first.end):
+                        if (
+                            first_pair.start == shift2_first.start
+                            and first_pair.end == shift2_first.end
+                        ):
                             shift = "2"
-                    
+
                     if 1 in self.data.schedule_time_shift_3:
                         shift3_first = self.data.schedule_time_shift_3[1]
-                        if (first_pair.start == shift3_first.start and 
-                            first_pair.end == shift3_first.end):
+                        if (
+                            first_pair.start == shift3_first.start
+                            and first_pair.end == shift3_first.end
+                        ):
                             shift = "3"
 
                 self.data_table.insertRow(row)
@@ -491,7 +499,9 @@ class InputDataDialog(QDialog):
                 row += 1
 
         elif variable_name == "discipline_hours":
-            self.var_help_label.setText(QMessageBoxHelpTexts.DISCIPLINE_HOURS_HELP.value)
+            self.var_help_label.setText(
+                QMessageBoxHelpTexts.DISCIPLINE_HOURS_HELP.value
+            )
             self.data_table.setColumnCount(3)
             self.data_table.setHorizontalHeaderLabels(["Группа", "Дисциплина", "Часы"])
             row = 0
@@ -535,9 +545,13 @@ class InputDataDialog(QDialog):
 
         elif variable_name in ["teachers_work_hours", "rooms_availability_hours"]:
             if variable_name == "teachers_work_hours":
-                self.var_help_label.setText(QMessageBoxHelpTexts.TEACHERS_WORK_HOURS_HELP.value)
+                self.var_help_label.setText(
+                    QMessageBoxHelpTexts.TEACHERS_WORK_HOURS_HELP.value
+                )
             else:
-                self.var_help_label.setText(QMessageBoxHelpTexts.ROOMS_AVAILABILITY_HELP.value)
+                self.var_help_label.setText(
+                    QMessageBoxHelpTexts.ROOMS_AVAILABILITY_HELP.value
+                )
             self._setup_schedule_table(variable_data)
 
         self.data_table.setEditTriggers(QTableWidget.DoubleClicked)
@@ -723,9 +737,11 @@ class InputDataDialog(QDialog):
                     self._save_schedule_changes(variable_data)
                 except Exception as e:
                     QMessageBox.warning(
-                        self, 
-                        QMessageBoxTitles.ERROR.value, 
-                        QMessageBoxMessages.SCHEDULE_SAVE_ERROR_TEMPLATE.value.format(e)
+                        self,
+                        QMessageBoxTitles.ERROR.value,
+                        QMessageBoxMessages.SCHEDULE_SAVE_ERROR_TEMPLATE.value.format(
+                            e
+                        ),
                     )
 
             setattr(self.data, table_name, variable_data)
@@ -752,16 +768,22 @@ class InputDataDialog(QDialog):
             # Подготовка информации о первых трех ошибках
             error_rows = ""
             for i, row_data in enumerate(invalid_data[:3]):
-                error_rows += QMessageBoxDataErrors.ROW_ERROR_TEMPLATE.value.format(i + 1, ", ".join(row_data))
-            
-            error_message = QMessageBoxMessages.DATA_ERROR_TEMPLATE.value.format(ru_table_name, error_rows)
+                error_rows += QMessageBoxDataErrors.ROW_ERROR_TEMPLATE.value.format(
+                    i + 1, ", ".join(row_data)
+                )
+
+            error_message = QMessageBoxMessages.DATA_ERROR_TEMPLATE.value.format(
+                ru_table_name, error_rows
+            )
             QMessageBox.warning(self, QMessageBoxTitles.DATA_ERROR.value, error_message)
         else:
             db.save_data(self.data)
             QMessageBox.information(
                 self,
                 QMessageBoxTitles.SAVING.value,
-                QMessageBoxMessages.DATA_SAVED_SUCCESS_TEMPLATE.value.format(ru_table_name),
+                QMessageBoxMessages.DATA_SAVED_SUCCESS_TEMPLATE.value.format(
+                    ru_table_name
+                ),
             )
 
     def event(self, event):
@@ -772,7 +794,11 @@ class InputDataDialog(QDialog):
 
     def show_help(self):
         # Отображение справки
-        QMessageBox.information(self, QMessageBoxTitles.HELP.value, QMessageBoxMessages.INPUT_DATA_HELP.value)
+        QMessageBox.information(
+            self,
+            QMessageBoxTitles.HELP.value,
+            QMessageBoxMessages.INPUT_DATA_HELP.value,
+        )
 
 
 class ErrorDialog(QDialog):
@@ -872,7 +898,11 @@ class ErrorDialog(QDialog):
 
     def show_help(self):
         # Отображение справки
-        QMessageBox.information(self, QMessageBoxTitles.HELP.value, QMessageBoxMessages.ERROR_DIALOG_HELP.value)
+        QMessageBox.information(
+            self,
+            QMessageBoxTitles.HELP.value,
+            QMessageBoxMessages.ERROR_DIALOG_HELP.value,
+        )
 
 
 class MainWindow(QMainWindow):
@@ -1062,7 +1092,9 @@ class MainWindow(QMainWindow):
             resp = QMessageBox.question(
                 self,
                 QMessageBoxTitles.ATTENTION.value,
-                QMessageBoxMessages.WORSE_SCHEDULE_QUESTION_TEMPLATE.value.format(rating['rate']),
+                QMessageBoxMessages.WORSE_SCHEDULE_QUESTION_TEMPLATE.value.format(
+                    rating["rate"]
+                ),
                 buttons=QMessageBox.Ok | QMessageBox.Cancel,
             )
             if resp == QMessageBox.Cancel:
@@ -1093,7 +1125,10 @@ class MainWindow(QMainWindow):
                 msg = "Расписание не сформировано"
                 raise ExportException(msg)
 
-            file_name = "ExportSchedule%s%s.xlsx" % (int(self.rating['rate']), datetime.datetime.now().strftime('%H%M%S'))
+            file_name = "ExportSchedule%s%s.xlsx" % (
+                int(self.rating["rate"]),
+                datetime.datetime.now().strftime("%H%M%S"),
+            )
             logger.info("Создание файла: %s", file_name)
 
             exp_data = []
@@ -1193,9 +1228,9 @@ class MainWindow(QMainWindow):
         except ExportException as e:
             logger.warning("Ошибка экспорта: %s", e)
             QMessageBox.warning(
-                self, 
-                QMessageBoxTitles.ERROR.value, 
-                QMessageBoxMessages.SCHEDULE_NOT_GENERATED_ERROR.value
+                self,
+                QMessageBoxTitles.ERROR.value,
+                QMessageBoxMessages.SCHEDULE_NOT_GENERATED_ERROR.value,
             )
         except Exception as e:
             logger.exception("Ошибка при экспорте расписания")
@@ -1211,9 +1246,9 @@ class MainWindow(QMainWindow):
             return
         if self.current_schedule is None:
             QMessageBox.warning(
-                self, 
-                QMessageBoxTitles.ERROR.value, 
-                QMessageBoxMessages.GENERATE_BEFORE_SORT_ERROR.value
+                self,
+                QMessageBoxTitles.ERROR.value,
+                QMessageBoxMessages.GENERATE_BEFORE_SORT_ERROR.value,
             )
             return
         sort_by = {
@@ -1257,7 +1292,9 @@ class MainWindow(QMainWindow):
             resp = QMessageBox.question(
                 self,
                 QMessageBoxTitles.ATTENTION.value,
-                QMessageBoxMessages.WORSE_SCHEDULE_QUESTION_TEMPLATE.value.format(rating["rate"]),
+                QMessageBoxMessages.WORSE_SCHEDULE_QUESTION_TEMPLATE.value.format(
+                    rating["rate"]
+                ),
                 buttons=QMessageBox.Ok | QMessageBox.Cancel,
             )
             if resp == QMessageBox.Cancel:
