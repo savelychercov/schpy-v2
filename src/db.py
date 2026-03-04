@@ -813,9 +813,12 @@ def get_db_session():
 
 def save_data_sqlalchemy(data) -> None:
     """Сохранение данных с использованием SQLAlchemy + Pydantic схемы"""
-    logger.info("Сохранение данных в SQLAlchemy базу")
+    logger.info("Saving data to SQLAlchemy database")
     logger.debug(
-        f"Сохраняем данные: counter={data.counter}, групп={len(data.discipline_hours)}, преподавателей={len(data.teachers)}"
+        "Saving data: counter=%d, groups=%d, teachers=%d",
+        data.counter,
+        len(data.discipline_hours),
+        len(data.teachers),
     )
 
     if SessionLocal is None:
@@ -978,12 +981,15 @@ def save_data_sqlalchemy(data) -> None:
 
         session.commit()
         logger.info(
-            f"Данные успешно сохранены: групп={len(data.discipline_hours)}, преподавателей={len(data.teachers)}, аудиторий={len(data.rooms)}"
+            "Data successfully saved: groups=%d, teachers=%d, rooms=%d",
+            len(data.discipline_hours),
+            len(data.teachers),
+            len(data.rooms),
         )
 
     except Exception as e:
         session.rollback()
-        logger.exception(f"Ошибка при сохранении данных: {e}")
+        logger.exception("Error saving data: %s", e)
         raise
     finally:
         session.close()
@@ -991,7 +997,7 @@ def save_data_sqlalchemy(data) -> None:
 
 def load_data_sqlalchemy() -> Data:
     """Загрузка данных с использованием SQLAlchemy + Pydantic схемы"""
-    logger.info("Загрузка данных из SQLAlchemy базы")
+    logger.info("Loading data from SQLAlchemy database")
 
     if SessionLocal is None:
         init_db()
@@ -1001,13 +1007,13 @@ def load_data_sqlalchemy() -> Data:
         # Проверяем, есть ли данные
         teacher_count = session.query(TeacherModel).count()
         if teacher_count == 0:
-            logger.info("База данных пуста, создаем пример данных")
+            logger.info("Database is empty, creating example data")
             session.close()
             example_data = ExampleData()
             save_data_sqlalchemy(example_data)
             return example_data
 
-        logger.debug(f"В базе найдено преподавателей: {teacher_count}")
+        logger.debug("Found teachers in database: %d", teacher_count)
 
         # Создаем объект данных
         data = EmptyData()
@@ -1015,18 +1021,21 @@ def load_data_sqlalchemy() -> Data:
         # Загружаем счетчик
         main_data = session.query(MainDataModel).filter_by(id=1).first()
         data.counter = main_data.counter if main_data else 1
-        logger.debug(f"Загружен счетчик запусков: {data.counter}")
+        logger.debug("Loaded launch counter: %d", data.counter)
 
         # Загружаем преподавателей и их расписание
         teacher_models = session.query(TeacherModel).all()
         data.teachers = {}
         data.teachers_work_hours = {}
 
-        logger.debug(f"Загрузка {len(teacher_models)} преподавателей...")
+        logger.debug("Loading %d teachers...", len(teacher_models))
 
         for i, teacher_model in enumerate(teacher_models, 1):
             logger.debug(
-                f"Загрузка преподавателя {i}/{len(teacher_models)}: {teacher_model.name}"
+                "Loading teacher %d/%d: %s",
+                i,
+                len(teacher_models),
+                teacher_model.name,
             )
             teacher_schema = TeacherSchema(
                 name=teacher_model.name,
@@ -1109,7 +1118,9 @@ def load_data_sqlalchemy() -> Data:
                 # Проверяем границы номера пары
                 if not MIN_PAIR_NUMBER <= schedule_model.pair_number <= MAX_PAIR_NUMBER:
                     logger.warning(
-                        f"Некорректный номер пары {schedule_model.pair_number} для аудитории {room_model.name}"
+                        "Invalid pair number %d for room %s",
+                        schedule_model.pair_number,
+                        room_model.name,
                     )
                     continue
 
@@ -1126,8 +1137,10 @@ def load_data_sqlalchemy() -> Data:
         data.discipline_hours = {}
 
         for group_model in group_models:
-            print(
-                f"Загрузка группы: {group_model.name}, shift_number из БД: {group_model.shift_number}"
+            logger.debug(
+                "Loading group: %s, shift_number from DB: %d",
+                group_model.name,
+                group_model.shift_number,
             )
 
             # Загружаем расписание пар для группы
@@ -1145,9 +1158,11 @@ def load_data_sqlalchemy() -> Data:
                 )
                 shift_pairs[pair_model.pair_number] = pair_time
                 if pair_model.pair_number == 1:
-                    print(
-                        f"  Первая пара: {pair_model.start_time} - {pair_model.end_time}"
-                    )
+                    logger.debug(
+                    "  First pair: %s - %s",
+                    pair_model.start_time,
+                    pair_model.end_time,
+                )
 
             data.groups_shift[group_model.name] = shift_pairs
 
@@ -1185,12 +1200,15 @@ def load_data_sqlalchemy() -> Data:
                 data.schedule_time_shift_3[shift_model.pair_number] = pair_time
 
         logger.info(
-            f"Данные успешно загружены: групп={len(data.discipline_hours)}, преподавателей={len(data.teachers)}, аудиторий={len(data.rooms)}"
+            "Data successfully loaded: groups=%d, teachers=%d, rooms=%d",
+            len(data.discipline_hours),
+            len(data.teachers),
+            len(data.rooms),
         )
         return data
 
     except Exception as e:
-        logger.exception(f"Ошибка при загрузке данных: {e}")
+        logger.exception("Error loading data: %s", e)
         raise
     finally:
         session.close()

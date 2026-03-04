@@ -6,6 +6,10 @@ from datetime import time
 from enum import Enum
 
 
+class ExportError(Exception):
+    """Исключение для ошибок экспорта расписания."""
+
+
 class PairType(str, Enum):
     """Типы учебных пар."""
 

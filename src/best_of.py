@@ -73,7 +73,7 @@ def shuffled_tuple(x: tuple) -> tuple:
 
 
 def sub_percentage(x: float, percentage: float) -> float:
-    # logger.debug(f"{x} - {percentage}% = {x - (x * percentage / 100)}")
+    # logger.debug("%d - %d%% = %f", x, percentage, x - (x * percentage / 100))
     return max(0, x - (x * percentage / 100))
 
 
@@ -176,21 +176,21 @@ def rate_schedule(
     rate = 100
     teachers_gaps_count = count_teachers_gaps(original_data, remaining_data)
     rate = sub_percentage(rate, teachers_gaps_count * TEACHERS_GAPS_RATING_MODIFIER)
-    # logger.debug(f"after teachers_gaps_count {rate}")
+    # logger.debug("after teachers_gaps_count %f", rate)
 
     offline_pairs_gaps = count_offline_pairs_gaps(schedule, original_data)
     rate = sub_percentage(rate, offline_pairs_gaps * OFFLINE_PAIRS_GAPS_RATING_MODIFIER)
-    # logger.debug(f"after offline_pairs_gaps {rate}")
+    # logger.debug("after offline_pairs_gaps %f", rate)
 
     overworked_teachers = count_overworked_teachers(schedule)
     rate = sub_percentage(
         rate, overworked_teachers * OVERWORKED_TEACHERS_RATING_MODIFIER
     )
-    # logger.debug(f"after overworked_teachers {rate}")
+    # logger.debug("after overworked_teachers %f", rate)
 
     unissued_hours = count_unissued_hours(remaining_data)
     rate = sub_percentage(rate, unissued_hours * UNISSUED_HOURS_RATING_MODIFIER)
-    # logger.debug(f"after unissued_hours {rate}")
+    # logger.debug("after unissued_hours %f", rate)
 
     return max(0, rate)
 
@@ -210,14 +210,14 @@ def get_counts(
 
 
 if __name__ == "__main__":
-    logger.info("Запуск оптимизации расписания")
+    logger.info("Starting schedule optimization")
     data = db.ExampleData()
     best_data = None
     best_schedule_obj = None
     best_rating = 0
 
     count_iterations = int(input("Введите количество итераций: "))
-    logger.info(f"Количество итераций: {count_iterations}")
+    logger.info("Number of iterations: %d", count_iterations)
     update_every = 3  # seconds
     progressbar_length = 20
     passed_time = 0
@@ -247,13 +247,21 @@ if __name__ == "__main__":
                 best_schedule_obj.pairs, best_data, best_schedule_obj.remaining_data
             )
             best_schedule_counts_str = (
-                f"TG: {best_schedule_counts['teachers_gaps_count']}, "
-                f"OPG: {best_schedule_counts['offline_pairs_gaps']}, "
-                f"OT: {best_schedule_counts['overworked_teachers']}, "
-                f"UH: {best_schedule_counts['unissued_hours']}"
+                "TG: {}, OPG: {}, OT: {}, UH: {}".format(
+                    best_schedule_counts["teachers_gaps_count"],
+                    best_schedule_counts["offline_pairs_gaps"],
+                    best_schedule_counts["overworked_teachers"],
+                    best_schedule_counts["unissued_hours"]
+                )
             )
             logger.debug(
-                f"Осталось времени: {str(round(remaining_time // 60)).rjust(2, '0') + 'м, ' if remaining_time >= 60 else ''}{str(round(remaining_time % 60)).rjust(2, '0')}с. {progressbar} {str(round(completion_percentage)).rjust(2, '0')}% / ({best_schedule_counts_str})"
+                "Time remaining: %s%02d:%02ds. %s %02d%% / (%s)",
+                ("%02dm, " if remaining_time >= 60 else ""),
+                round(remaining_time // 60),
+                round(remaining_time % 60),
+                progressbar,
+                round(completion_percentage),
+                best_schedule_counts_str
             )
         data_copy = shuffle_data(data)
         schedule_obj = schedule_maker.make_full_schedule(data_copy)
@@ -268,18 +276,18 @@ if __name__ == "__main__":
         else:
             del schedule_obj
 
-    logger.info(f"Лучшее расписание: {best_rating}")
+    logger.info("Best schedule: %.2f", best_rating)
     schedule_maker.print_schedule(best_schedule_obj.pairs)
     logger.info(
-        f"Teachers gaps: {count_teachers_gaps(best_data, best_schedule_obj.remaining_data)}"
+        "Teachers gaps: %d", count_teachers_gaps(best_data, best_schedule_obj.remaining_data)
     )
     logger.info(
-        f"Offline pairs gaps: {count_offline_pairs_gaps(best_schedule_obj.pairs, best_data)}"
+        "Offline pairs gaps: %d", count_offline_pairs_gaps(best_schedule_obj.pairs, best_data)
     )
     logger.info(
-        f"Overworked teachers: {count_overworked_teachers(best_schedule_obj.pairs)}"
+        "Overworked teachers: %d", count_overworked_teachers(best_schedule_obj.pairs)
     )
     logger.info(
-        f"Unissued hours: {count_unissued_hours(best_schedule_obj.remaining_data)}"
+        "Unissued hours: %d", count_unissued_hours(best_schedule_obj.remaining_data)
     )
-    logger.info("Оптимизация расписания завершена")
+    logger.info("Schedule optimization completed")

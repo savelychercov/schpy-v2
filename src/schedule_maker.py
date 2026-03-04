@@ -55,11 +55,11 @@ class Schedule:
 
 
 def print_schedule(schedule: dict[str, list[PairSchema]]) -> None:
-    logger.debug("Вывод расписания:")
+    logger.debug("Printing schedule:")
     for group in schedule:
-        logger.debug(f"Группа: {group}")
+        logger.debug("Group: %s", group)
         for pair in schedule[group]:
-            logger.debug(f"  {pair}")
+            logger.debug("  %s", pair)
 
 
 def sorted_pairs(pairs: dict[str, list[PairSchema]]) -> dict[str, list[PairSchema]]:
@@ -117,10 +117,13 @@ def get_schedule_for(
 
 
 def print_errors(errors_list: list[ScheduleError]) -> None:
-    logger.warning(f"Ошибки расписания ({len(errors_list)}):")
+    logger.warning("Schedule errors (%d):", len(errors_list))
     for error in errors_list:
         logger.warning(
-            f"Невозможно поставить пару для группы {error.group}, для дисциплины {error.discipline}, оставшиеся часы: {error.hours}"
+            "Cannot place pair for group %s, discipline %s, remaining hours: %d",
+            error.group,
+            error.discipline,
+            error.hours,
         )
 
 
@@ -238,22 +241,26 @@ def make_full_schedule(data: DataSchema) -> Schedule:
     import time
 
     start_time = time.time()
-    logger.info("Начало генерации полного расписания")
+    logger.info("Starting full schedule generation")
     logger.debug(
-        f"Входные данные: групп={len(data.discipline_hours)}, преподавателей={len(data.teachers)}"
+        "Input data: groups=%d, teachers=%d",
+        len(data.discipline_hours),
+        len(data.teachers),
     )
 
     data = copy.deepcopy(data)
     full_schedule, errors = distribute_pairs(data)
-    logger.info(f"Распределение пар завершено, ошибок: {len(errors)}")
+    logger.info("Pairs distribution completed, errors: %d", len(errors))
 
     full_schedule = distribute_classrooms(full_schedule, data)
-    logger.info("Распределение аудиторий завершено")
+    logger.info("Classrooms distribution completed")
 
     full_schedule = sorted_pairs(full_schedule)
     elapsed_time = time.time() - start_time
     logger.info(
-        f"Генерация расписания завершена, групп: {len(full_schedule)}, время: {elapsed_time:.2f}с"
+        "Schedule generation completed, groups: %d, time: %.2fs",
+        len(full_schedule),
+        elapsed_time,
     )
     return Schedule(pairs=full_schedule, errors=errors, remaining_data=data)
 
