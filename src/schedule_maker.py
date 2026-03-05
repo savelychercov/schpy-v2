@@ -23,6 +23,7 @@
 """
 
 import copy
+import time
 from dataclasses import dataclass
 
 from config.constants import DAYS, PairType, RoomPrefix
@@ -42,7 +43,13 @@ logger = get_logger("schedule_maker")
 
 
 class ScheduleError(ValueError):
-    def __init__(self, message: str, discipline=None, group=None, hours=None):
+    def __init__(
+        self,
+        message: str,
+        discipline: str | None = None,
+        group: str | None = None,
+        hours: int | None = None,
+    ):
         super().__init__(message)
         self.discipline = discipline
         self.group = group
@@ -59,16 +66,40 @@ class Schedule:
 def print_schedule(schedule: dict[str, list[PairSchema]]) -> None:
     if ENABLE_SCHEDULE_LOGS:
         logger.debug("Printing schedule:")
-        for group in schedule:
+        for group, group_pairs in schedule.items():
             logger.debug("Group: %s", group)
-            for pair in schedule[group]:
+            for pair in group_pairs:
                 logger.debug("  %s", pair)
 
 
 def sorted_pairs(pairs: dict[str, list[PairSchema]]) -> dict[str, list[PairSchema]]:
-    for group in pairs:
-        pairs[group] = sorted(pairs[group], key=lambda p: DAYS.index(p.day))
+    for group, group_pairs in pairs.items():
+        pairs[group] = sorted(group_pairs, key=lambda p: DAYS.index(p.day))
     return pairs
+
+
+def _filter_pairs_by_key(
+    pairs: list[PairSchema], key: str, value: str
+) -> list[PairSchema]:
+    """Filter pairs based on the given key and value."""
+    filter_map = {
+        "group": lambda pair: pair.group == value,
+        "discipline": lambda pair: pair.discipline == value,
+        "teacher": lambda pair: pair.teacher == value,
+        "classroom": lambda pair: pair.classroom == value,
+        "pair_type": lambda pair: pair.pair_type == value,
+        "day": lambda pair: pair.day == value,
+        "number": lambda pair: pair.number == value,
+        "pair_time": lambda pair: pair.pair_time == value,
+        "date": lambda pair: pair.date == value,
+    }
+
+    filter_func = filter_map.get(key)
+    if filter_func is None:
+        msg = f"Неизвестный ключ '{key}'"
+        raise ValueError(msg)
+
+    return list(filter(filter_func, pairs))
 
 
 def get_schedule_for(
@@ -76,46 +107,7 @@ def get_schedule_for(
 ) -> dict[str, list[PairSchema]]:
     pairs_list = copy.deepcopy(pairs)
     for group in pairs_list:
-        match key:
-            case "group":
-                pairs_list[group] = list(
-                    filter(lambda pair: pair.group == value, pairs_list[group])
-                )
-            case "discipline":
-                pairs_list[group] = list(
-                    filter(lambda pair: pair.discipline == value, pairs_list[group])
-                )
-            case "teacher":
-                pairs_list[group] = list(
-                    filter(lambda pair: pair.teacher == value, pairs_list[group])
-                )
-            case "classroom":
-                pairs_list[group] = list(
-                    filter(lambda pair: pair.classroom == value, pairs_list[group])
-                )
-            case "pair_type":
-                pairs_list[group] = list(
-                    filter(lambda pair: pair.pair_type == value, pairs_list[group])
-                )
-            case "day":
-                pairs_list[group] = list(
-                    filter(lambda pair: pair.day == value, pairs_list[group])
-                )
-            case "number":
-                pairs_list[group] = list(
-                    filter(lambda pair: pair.number == value, pairs_list[group])
-                )
-            case "pair_time":
-                pairs_list[group] = list(
-                    filter(lambda pair: pair.pair_time == value, pairs_list[group])
-                )
-            case "date":
-                pairs_list[group] = list(
-                    filter(lambda pair: pair.date == value, pairs_list[group])
-                )
-            case _:
-                msg = f"Неизвестный ключ '{key}'"
-                raise ValueError(msg)
+        pairs_list[group] = _filter_pairs_by_key(pairs_list[group], key, value)
     return pairs_list
 
 
@@ -208,12 +200,14 @@ def distribute_pairs(
     return full_schedule, errors  # Возвращаем полное расписание
 
 
-def distribute_classrooms(
-        raw_sch: dict, data: DataSchema
+def distribute_classrooms(  # noqa: C901, PLR0912
+    raw_sch: dict, data: DataSchema
 ) -> dict[str, list[PairSchema]]:
     available_rooms: dict[str, RoomScheduleSchema] = data.rooms_availability_hours
     if ENABLE_SCHEDULE_LOGS:
-        logger.info("Starting classroom distribution, available rooms: %d", len(available_rooms))
+        logger.info(
+            "Starting classroom distribution, available rooms: %d", len(available_rooms)
+        )
 
     # Создаем временные рабочие копии расписаний
     working_rooms = {}
@@ -223,8 +217,14 @@ def distribute_classrooms(
             for day, schedule in room_schedule.schedule_for_days.items()
         }
         if ENABLE_SCHEDULE_LOGS:
-            logger.debug("Room %s initial state: %s", room_name,
-                         {day: working_rooms[room_name][day][:3] for day in ["Понедельник", "Вторник", "Среда"]})
+            logger.debug(
+                "Room %s initial state: %s",
+                room_name,
+                {
+                    day: working_rooms[room_name][day][:3]
+                    for day in ["Понедельник", "Вторник", "Среда"]
+                },
+            )
 
     pairs_without_classroom = 0
     pairs_with_classroom = 0
@@ -244,16 +244,18 @@ def distribute_classrooms(
 
             # Конвертируем время в номер пары
             pair_time_db = PairTime(
-                pair.pair_time.start,
-                pair.pair_time.end,
-                pair.pair_time.pair_type
+                pair.pair_time.start, pair.pair_time.end, pair.pair_time.pair_type
             )
             pair_number = RoomSchedule.get_pair_number(pair_time_db)
 
             if pair_number is None:
                 if ENABLE_SCHEDULE_LOGS:
-                    logger.warning("Could not determine pair number for %s - %s at %s",
-                                   group, pair.discipline, pair.day)
+                    logger.warning(
+                        "Could not determine pair number for %s - %s at %s",
+                        group,
+                        pair.discipline,
+                        pair.day,
+                    )
                 continue
 
             # Ищем свободную аудиторию
@@ -274,8 +276,14 @@ def distribute_classrooms(
                     assigned = True
                     pairs_with_classroom += 1
                     if ENABLE_SCHEDULE_LOGS:
-                        logger.debug("Assigned room %s to %s - %s at %s pair %d",
-                                     room_name, group, pair.discipline, pair.day, pair_number)
+                        logger.debug(
+                            "Assigned room %s to %s - %s at %s pair %d",
+                            room_name,
+                            group,
+                            pair.discipline,
+                            pair.day,
+                            pair_number,
+                        )
                     break
 
             if not assigned and ENABLE_SCHEDULE_LOGS:
@@ -288,23 +296,37 @@ def distribute_classrooms(
                     if day_schedule and pair_number <= len(day_schedule):
                         if day_schedule[pair_number - 1]:
                             available_at_time.append(room_name)
-                logger.warning("No room for %s - %s at %s pair %d. Available rooms at that time: %s",
-                               group, pair.discipline, pair.day, pair_number, available_at_time)
+                logger.warning(
+                    "No room for %s - %s at %s pair %d. Available rooms at that time: %s",
+                    group,
+                    pair.discipline,
+                    pair.day,
+                    pair_number,
+                    available_at_time,
+                )
 
     if ENABLE_SCHEDULE_LOGS:
         # Покажем финальное состояние аудиторий
         for room_name, room_schedule_dict in working_rooms.items():
-            logger.debug("Room %s final state: %s", room_name,
-                         {day: room_schedule_dict[day][:3] for day in ["Понедельник", "Вторник", "Среда"]})
-        logger.info("Classroom distribution completed. Pairs processed: %d, with classrooms: %d, without: %d",
-                    pairs_without_classroom + pairs_with_classroom, pairs_with_classroom, pairs_without_classroom)
+            logger.debug(
+                "Room %s final state: %s",
+                room_name,
+                {
+                    day: room_schedule_dict[day][:3]
+                    for day in ["Понедельник", "Вторник", "Среда"]
+                },
+            )
+        logger.info(
+            "Classroom distribution completed. Pairs processed: %d, with classrooms: %d, without: %d",
+            pairs_without_classroom + pairs_with_classroom,
+            pairs_with_classroom,
+            pairs_without_classroom,
+        )
 
     return raw_sch
 
 
 def make_full_schedule(data: DataSchema) -> Schedule:
-    import time
-
     start_time = time.time()
     if ENABLE_SCHEDULE_LOGS:
         logger.info("Starting full schedule generation")
@@ -317,10 +339,17 @@ def make_full_schedule(data: DataSchema) -> Schedule:
     elapsed_time = time.time() - start_time
     if ENABLE_SCHEDULE_LOGS:
         total_pairs = sum(len(pairs) for pairs in full_schedule.values())
-        pairs_with_rooms = sum(1 for pairs in full_schedule.values() for pair in pairs if pair.classroom is not None)
+        pairs_with_rooms = sum(
+            1
+            for pairs in full_schedule.values()
+            for pair in pairs
+            if pair.classroom is not None
+        )
         logger.info(
             "Schedule generation completed, total pairs: %d, with rooms: %d, time: %.2fs",
-            total_pairs, pairs_with_rooms, elapsed_time,
+            total_pairs,
+            pairs_with_rooms,
+            elapsed_time,
         )
 
     return Schedule(pairs=full_schedule, errors=errors, remaining_data=data)

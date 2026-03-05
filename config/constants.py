@@ -3,7 +3,7 @@
 """
 
 from datetime import time
-from enum import Enum
+from enum import StrEnum
 
 
 class ExportError(Exception):
@@ -30,14 +30,14 @@ DAY_MAPPING = {
 }
 
 
-class PairType(str, Enum):
+class PairType(StrEnum):
     """Типы учебных пар."""
 
     OFFLINE = "Офлайн"
     ONLINE = "Онлайн"
 
 
-class DayOfWeek(str, Enum):
+class DayOfWeek(StrEnum):
     """Дни недели."""
 
     MONDAY = "Понедельник"
@@ -49,7 +49,7 @@ class DayOfWeek(str, Enum):
     SUNDAY = "Воскресенье"
 
 
-class RoomPrefix(str, Enum):
+class RoomPrefix(StrEnum):
     """Префиксы аудиторий."""
 
     CLASSROOM = "К"  # Классная комната (офлайн)

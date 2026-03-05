@@ -20,7 +20,7 @@ from pathlib import Path
 # Устанавливаем локаль для правильной работы с кириллицей
 try:
     locale.setlocale(locale.LC_ALL, "Russian_Russia.1251")
-except:
+except (locale.Error, OSError):
     with contextlib.suppress(BaseException):
         locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
 

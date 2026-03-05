@@ -48,6 +48,7 @@ from config.constants import (
     MAX_WORKING_HOURS_FOR_TEACHER,
     OFFLINE_PAIRS_GAPS_RATING_MODIFIER,
     OVERWORKED_TEACHERS_RATING_MODIFIER,
+    SECONDS_PER_MINUTE,
     TEACHERS_GAPS_RATING_MODIFIER,
     UNISSUED_HOURS_RATING_MODIFIER,
     WORKWEEK_DAYS,
@@ -254,24 +255,22 @@ if __name__ == "__main__":
             best_schedule_counts = get_counts(
                 best_schedule_obj.pairs, best_data, best_schedule_obj.remaining_data
             )
-            best_schedule_counts_str = (
-                "TG: {}, OPG: {}, OT: {}, UH: {}".format(
-                    best_schedule_counts["teachers_gaps_count"],
-                    best_schedule_counts["offline_pairs_gaps"],
-                    best_schedule_counts["overworked_teachers"],
-                    best_schedule_counts["unissued_hours"]
-                )
+            best_schedule_counts_str = "TG: {}, OPG: {}, OT: {}, UH: {}".format(
+                best_schedule_counts["teachers_gaps_count"],
+                best_schedule_counts["offline_pairs_gaps"],
+                best_schedule_counts["overworked_teachers"],
+                best_schedule_counts["unissued_hours"],
             )
             if ENABLE_SCHEDULE_LOGS:
                 logger.debug(
                     "Time remaining: %s%02d:%02ds. %s %02d%% / (%s)",
-                    ("%02dm, " if remaining_time >= 60 else ""),
-                    round(remaining_time // 60),
-                round(remaining_time % 60),
-                progressbar,
-                round(completion_percentage),
-                best_schedule_counts_str
-            )
+                    ("%02dm, " if remaining_time >= SECONDS_PER_MINUTE else ""),
+                    round(remaining_time // SECONDS_PER_MINUTE),
+                    round(remaining_time % SECONDS_PER_MINUTE),
+                    progressbar,
+                    round(completion_percentage),
+                    best_schedule_counts_str,
+                )
         data_copy = shuffle_data(data)
         schedule_obj = schedule_maker.make_full_schedule(data_copy)
         schedule_rating = rate_schedule(
@@ -289,13 +288,16 @@ if __name__ == "__main__":
         logger.info("Best schedule: %.2f", best_rating)
         schedule_maker.print_schedule(best_schedule_obj.pairs)
         logger.info(
-            "Teachers gaps: %d", count_teachers_gaps(best_data, best_schedule_obj.remaining_data)
+            "Teachers gaps: %d",
+            count_teachers_gaps(best_data, best_schedule_obj.remaining_data),
         )
         logger.info(
-            "Offline pairs gaps: %d", count_offline_pairs_gaps(best_schedule_obj.pairs, best_data)
+            "Offline pairs gaps: %d",
+            count_offline_pairs_gaps(best_schedule_obj.pairs, best_data),
         )
         logger.info(
-            "Overworked teachers: %d", count_overworked_teachers(best_schedule_obj.pairs)
+            "Overworked teachers: %d",
+            count_overworked_teachers(best_schedule_obj.pairs),
         )
         logger.info(
             "Unissued hours: %d", count_unissued_hours(best_schedule_obj.remaining_data)

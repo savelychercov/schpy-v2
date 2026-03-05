@@ -42,7 +42,6 @@
 """
 
 import json
-import os
 import sys
 from abc import ABC, abstractmethod
 from datetime import time, timedelta
@@ -61,21 +60,22 @@ from sqlalchemy import (
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
-from config.logger import get_logger
-
-logger = get_logger("db")
-
 from config.constants import (
+    DAY_MAPPING,
     DAYS,
     DB_FILE,
     DB_PATH_NAME,
     MAX_PAIR_NUMBER,
     MIN_PAIR_NUMBER,
     PAIRS_PER_DAY,
+    SHIFT_ONE,
+    SHIFT_THREE,
+    SHIFT_TWO,
     TEACHERS_SCHEDULE_TIME,
     PairType,
     RoomPrefix,
 )
+from config.logger import get_logger
 from src.schemas import (
     DataSchema,
     PairSchema,
@@ -85,6 +85,8 @@ from src.schemas import (
     TeacherSchema,
     TeachersScheduleSchema,
 )
+
+logger = get_logger("db")
 
 # region Classes
 
@@ -188,7 +190,6 @@ class TeachersSchedule:  # teachers_schedule: day, pairs
     def get_pair_number(pair_time: PairTime) -> int | None:
         # Get number from teachers_schedule_time
         for number, (start, end) in TEACHERS_SCHEDULE_TIME.items():
-            # print(f"{start} <= {pair_time} <= {end}: {pair_time.start <= end and pair_time.end >= start}")
             # Check if the pair_time overlaps with the scheduled time
             if pair_time.start <= end and pair_time.end >= start:  # M
                 return number
@@ -222,8 +223,6 @@ class TeachersSchedule:  # teachers_schedule: day, pairs
     @classmethod
     def from_schema(cls, schema: "TeachersScheduleSchema") -> "TeachersSchedule":
         """Создать TeachersSchedule из TeachersScheduleSchema"""
-        from config.constants import DAY_MAPPING
-
         # Конвертируем английские поля в русские названия
         schedule_data = {}
         for eng_field, rus_name in DAY_MAPPING.items():
@@ -233,9 +232,6 @@ class TeachersSchedule:  # teachers_schedule: day, pairs
 
     def to_schema(self) -> "TeachersScheduleSchema":
         """Конвертировать TeachersSchedule в TeachersScheduleSchema"""
-        from config.constants import DAY_MAPPING
-        from src.schemas import TeachersScheduleSchema
-
         # Конвертируем русские названия в английские поля
         schema_data = {}
         for eng_field, rus_name in DAY_MAPPING.items():
@@ -293,8 +289,6 @@ class RoomSchedule:
     @classmethod
     def from_schema(cls, schema: "RoomScheduleSchema") -> "RoomSchedule":
         """Создать RoomSchedule из RoomScheduleSchema"""
-        from config.constants import DAY_MAPPING
-
         # Конвертируем английские поля в русские названия
         schedule_data = {}
         for eng_field, rus_name in DAY_MAPPING.items():
@@ -304,9 +298,6 @@ class RoomSchedule:
 
     def to_schema(self) -> "RoomScheduleSchema":
         """Конвертировать RoomSchedule в RoomScheduleSchema"""
-        from config.constants import DAY_MAPPING
-        from src.schemas import RoomScheduleSchema
-
         # Конвертируем русские названия в английские поля
         schema_data = {}
         for eng_field, rus_name in DAY_MAPPING.items():
@@ -619,35 +610,6 @@ class ExampleData(Data):
         }
 
 
-# region SQLAlchemy Models
-
-Base = declarative_base()
-
-
-class TeacherModel(Base):
-    __tablename__ = "teachers"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, unique=True, nullable=False)
-    disciplines = Column(Text, nullable=False)  # JSON сериализация set
-    groups = Column(Text, nullable=False)  # JSON сериализация set
-
-    # Связь с расписанием
-    schedules = relationship(
-        "TeacherScheduleModel", back_populates="teacher", cascade="all, delete-orphan"
-    )
-
-    def to_teacher(self):
-        """Конвертация в объект Teacher"""
-        import json
-
-        return Teacher(
-            name=self.name,
-            disciplines=set(json.loads(self.disciplines)),
-            groups=set(json.loads(self.groups)),
-        )
-
-
 # region SQLAlchemy Models (Improved)
 
 Base = declarative_base()
@@ -668,7 +630,6 @@ class TeacherModel(Base):
 
     def to_teacher(self):
         """Конвертация в объект Teacher"""
-        import json
 
         return Teacher(
             name=self.name,
@@ -833,9 +794,9 @@ SessionLocal = None
 
 def init_db():
     """Инициализация SQLAlchemy базы данных"""
-    global engine, SessionLocal
-
     db_path = get_sqlite_db_path()
+
+    global engine, SessionLocal  # noqa: PLW0603
     engine = create_engine(f"sqlite:///{db_path}", echo=False)
     SessionLocal = sessionmaker(bind=engine)
 
@@ -864,10 +825,8 @@ def get_db_session():
 # region SQLAlchemy Database Functions (Improved)
 
 
-def save_data_sqlalchemy(data) -> None:
+def save_data_sqlalchemy(data: Data) -> None:  # noqa: C901, PLR0912, PLR0915
     """Сохранение данных с использованием SQLAlchemy + Pydantic схемы"""
-    print(f"Сохранение в БД: {data.rooms_availability_hours = }")
-
     logger.info("Saving data to SQLAlchemy database")
     logger.debug(
         "Saving data: counter=%d, groups=%d, teachers=%d",
@@ -1042,15 +1001,15 @@ def save_data_sqlalchemy(data) -> None:
             len(data.rooms),
         )
 
-    except Exception as e:
+    except Exception:
         session.rollback()
-        logger.exception("Error saving data: %s", e)
+        logger.exception("Error saving data")
         raise
     finally:
         session.close()
 
 
-def load_data_sqlalchemy() -> Data:
+def load_data_sqlalchemy() -> Data:  # noqa: C901, PLR0912, PLR0915
     """Загрузка данных с использованием SQLAlchemy + Pydantic схемы"""
     logger.info("Loading data from SQLAlchemy database")
 
@@ -1121,7 +1080,9 @@ def load_data_sqlalchemy() -> Data:
                 # Проверяем, что день существует в расписании
                 if schedule_model.day not in teachers_schedule.schedule_for_days:
                     logger.warning(
-                        f"Неизвестный день '{schedule_model.day}' для преподавателя {teacher.name}"
+                        "Неизвестный день '%s' для преподавателя %s",
+                        schedule_model.day,
+                        teacher.name,
                     )
                     continue
 
@@ -1134,7 +1095,9 @@ def load_data_sqlalchemy() -> Data:
                 # Проверяем границы номера пары
                 if not MIN_PAIR_NUMBER <= schedule_model.pair_number <= MAX_PAIR_NUMBER:
                     logger.warning(
-                        f"Некорректный номер пары {schedule_model.pair_number} для преподавателя {teacher.name}"
+                        "Некорректный номер пары %d для преподавателя %s",
+                        schedule_model.pair_number,
+                        teacher.name,
                     )
                     continue
 
@@ -1161,7 +1124,9 @@ def load_data_sqlalchemy() -> Data:
                 # Проверяем, что день существует в расписании
                 if schedule_model.day not in room_schedule.schedule_for_days:
                     logger.warning(
-                        f"Неизвестный день '{schedule_model.day}' для аудитории {room_model.name}"
+                        "Неизвестный день '%s' для аудитории %s",
+                        schedule_model.day,
+                        room_model.name,
                     )
                     continue
 
@@ -1214,10 +1179,10 @@ def load_data_sqlalchemy() -> Data:
                 shift_pairs[pair_model.pair_number] = pair_time
                 if pair_model.pair_number == 1:
                     logger.debug(
-                    "  First pair: %s - %s",
-                    pair_model.start_time,
-                    pair_model.end_time,
-                )
+                        "  First pair: %s - %s",
+                        pair_model.start_time,
+                        pair_model.end_time,
+                    )
 
             data.groups_shift[group_model.name] = shift_pairs
 
@@ -1247,11 +1212,11 @@ def load_data_sqlalchemy() -> Data:
                 pair_type=shift_model.pair_type,
             )
 
-            if shift_model.shift_number == 1:
+            if shift_model.shift_number == SHIFT_ONE:
                 data.schedule_time_shift_1[shift_model.pair_number] = pair_time
-            elif shift_model.shift_number == 2:
+            elif shift_model.shift_number == SHIFT_TWO:
                 data.schedule_time_shift_2[shift_model.pair_number] = pair_time
-            elif shift_model.shift_number == 3:
+            elif shift_model.shift_number == SHIFT_THREE:
                 data.schedule_time_shift_3[shift_model.pair_number] = pair_time
 
         logger.info(
@@ -1261,21 +1226,19 @@ def load_data_sqlalchemy() -> Data:
             len(data.rooms),
         )
 
-        print(f"ЗАГРУЖЕНО ИЗ БД: {data.rooms_availability_hours = }")
-
-        return data
-
-    except Exception as e:
-        logger.exception("Error loading data: %s", e)
+    except Exception:
+        logger.exception("Error loading data")
         raise
     finally:
         session.close()
+
+    return data
 
 
 # endregion
 
 
-def save_data(data) -> None:
+def save_data(data: Data) -> None:
     """Сохранение данных с использованием SQLAlchemy"""
     logger.debug("Вызов save_data")
     save_data_sqlalchemy(data)
@@ -1290,16 +1253,16 @@ def load_data() -> Data:
 def check_exists_data() -> bool:
     """Проверка существования SQLite базы данных"""
     db_path = get_sqlite_db_path()
-    return os.path.exists(db_path)
+    return Path(db_path).exists()
 
 
-def resource_path(relative_path):
-    base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base_path, relative_path)
+def resource_path(relative_path: str) -> str:
+    base_path = getattr(sys, "_MEIPASS", str(Path(__file__).resolve().parent))
+    return str(base_path / relative_path)
 
 
 def get_data_file_path():
-    base_path = Path(os.path.expanduser("~")) / DB_PATH_NAME
+    base_path = Path("~").expanduser() / DB_PATH_NAME
     base_path.mkdir(parents=True, exist_ok=True)
     return base_path / DB_FILE
 

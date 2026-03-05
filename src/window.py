@@ -35,6 +35,7 @@ import os
 import sys
 import time
 import traceback
+import typing
 from pathlib import Path
 from pprint import pp
 
@@ -62,13 +63,11 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-import typing
 
 from config.constants import (
-    DEFAULT_ITERATIONS,
     DAY_MAPPING,
+    DEFAULT_ITERATIONS,
     EXCEL_COLUMN_WIDTH_PADDING,
-    ExportError,
     HELP_LABEL_WIDTH,
     MAX_ITERATIONS,
     MIN_ITERATIONS,
@@ -80,6 +79,7 @@ from config.constants import (
     WINDOW_WIDTH,
     WINDOW_X,
     WINDOW_Y,
+    ExportError,
 )
 from config.logger import get_logger
 from config.messages import (
@@ -109,7 +109,9 @@ class ScheduleGeneratorWorkerThread(QThread):
         self.is_running = True
 
     def run(self):
-        logger.info("Starting schedule generation thread (%d iterations)", self.iterations)
+        logger.info(
+            "Starting schedule generation thread (%d iterations)", self.iterations
+        )
         start_time = time.time()
 
         for iteration in range(1, self.iterations + 1):
@@ -180,7 +182,9 @@ class ScheduleGeneratorDialog(QDialog):
         self.result = None
         self.rating = None
 
-        with Path(db.resource_path(f"../css/{self.__class__.__name__}.css")).open() as style_file:
+        with Path(
+            db.resource_path(f"../css/{self.__class__.__name__}.css")
+        ).open() as style_file:
             self.setStyleSheet(style_file.read())
         self.setWindowIcon(QIcon(db.resource_path("../icon.ico")))
 
@@ -282,7 +286,9 @@ class InputDataDialog(QDialog):
         logger.debug("Creating input data dialog")
         super().__init__(parent=None)
 
-        with Path(db.resource_path(f"../css/{self.__class__.__name__}.css")).open() as f:
+        with Path(
+            db.resource_path(f"../css/{self.__class__.__name__}.css")
+        ).open() as f:
             self.setStyleSheet(f.read())
         self.setWindowIcon(QIcon(db.resource_path("../icon.ico")))
 
@@ -505,29 +511,33 @@ class InputDataDialog(QDialog):
         # Check all shifts independently
         if 1 in self.data.schedule_time_shift_1:
             shift1_first = self.data.schedule_time_shift_1[1]
-            if (first_pair.start == shift1_first.start and
-                first_pair.end == shift1_first.end):
+            if (
+                first_pair.start == shift1_first.start
+                and first_pair.end == shift1_first.end
+            ):
                 return "1"
 
         if 1 in self.data.schedule_time_shift_2:
             shift2_first = self.data.schedule_time_shift_2[1]
-            if (first_pair.start == shift2_first.start and
-                first_pair.end == shift2_first.end):
+            if (
+                first_pair.start == shift2_first.start
+                and first_pair.end == shift2_first.end
+            ):
                 return "2"
 
         if 1 in self.data.schedule_time_shift_3:
             shift3_first = self.data.schedule_time_shift_3[1]
-            if (first_pair.start == shift3_first.start and
-                first_pair.end == shift3_first.end):
+            if (
+                first_pair.start == shift3_first.start
+                and first_pair.end == shift3_first.end
+            ):
                 return "3"
 
         return None
 
     def _display_discipline_hours(self, variable_data: dict) -> None:
         """Display discipline hours data in table."""
-        self.var_help_label.setText(
-            QMessageBoxHelpTexts.DISCIPLINE_HOURS_HELP.value
-        )
+        self.var_help_label.setText(QMessageBoxHelpTexts.DISCIPLINE_HOURS_HELP.value)
         self.data_table.setColumnCount(3)
         self.data_table.setHorizontalHeaderLabels(["Группа", "Дисциплина", "Часы"])
 
@@ -900,7 +910,9 @@ class ErrorDialog(QDialog):
         )  # Добавляем кнопку справки
 
         # Загрузка стиля
-        with Path(db.resource_path(f"../css/{self.__class__.__name__}.css")).open() as f:
+        with Path(
+            db.resource_path(f"../css/{self.__class__.__name__}.css")
+        ).open() as f:
             self.setStyleSheet(f.read())
         self.setWindowIcon(QIcon(db.resource_path("../icon.ico")))
 
@@ -1087,7 +1099,9 @@ class MainWindow(QMainWindow):
 
     def _load_stylesheet(self) -> None:
         """Load the CSS stylesheet."""
-        with Path(db.resource_path(f"../css/{self.__class__.__name__}.css")).open() as f:
+        with Path(
+            db.resource_path(f"../css/{self.__class__.__name__}.css")
+        ).open() as f:
             self.setStyleSheet(f.read())
         self.resize_columns()
 
@@ -1181,10 +1195,8 @@ class MainWindow(QMainWindow):
     def generate_schedule(self):
         start_time = time.time()
         logger.info("Starting schedule generation")
-        print(f"ДО ГЕНЕРАЦИИ {self.data.rooms_availability_hours = }")
         working_data = copy.deepcopy(self.data)
         sch = schedule_maker.make_full_schedule(working_data)
-        print(f"ПОСЛЕ ГЕНЕРАЦИИ {self.data.rooms_availability_hours = }")
         self.current_schedule = sch
         self.errors = sch.errors
         elapsed_time = time.time() - start_time
@@ -1267,7 +1279,9 @@ class MainWindow(QMainWindow):
         workbook.save(file_name)
         return file_name
 
-    def _prepare_export_data(self, row_count: int, column_count: int) -> list[list[str]]:
+    def _prepare_export_data(
+        self, row_count: int, column_count: int
+    ) -> list[list[str]]:
         exp_data = []
         for row in range(row_count):
             row_data = []
@@ -1304,24 +1318,36 @@ class MainWindow(QMainWindow):
 
         for err_num, err in enumerate(self.errors):
             sheet.cell(row=3 + err_num, column=column_count + 2, value=err.group)
-            sheet.cell(
-                row=3 + err_num, column=column_count + 3, value=err.discipline
-            )
+            sheet.cell(row=3 + err_num, column=column_count + 3, value=err.discipline)
             sheet.cell(row=3 + err_num, column=column_count + 4, value=err.hours)
 
     def _fill_excel_rating(self, sheet: Worksheet, column_count: int) -> None:
         rating_info = [
             (len(self.errors) + 4, f"Рейтинг: {self.rating['rate']}"),
-            (len(self.errors) + 5, f"Окна у преподавателей: {self.rating['teachers_gaps_count']}"),
-            (len(self.errors) + 6, f"Пропущенные пары: {self.rating['offline_pairs_gaps']}"),
-            (len(self.errors) + 7, f"Перегруженные преподаватели: {self.rating['overworked_teachers']}"),
-            (len(self.errors) + 8, f"Неиспользованные часы: {self.rating['unissued_hours']}"),
+            (
+                len(self.errors) + 5,
+                f"Окна у преподавателей: {self.rating['teachers_gaps_count']}",
+            ),
+            (
+                len(self.errors) + 6,
+                f"Пропущенные пары: {self.rating['offline_pairs_gaps']}",
+            ),
+            (
+                len(self.errors) + 7,
+                f"Перегруженные преподаватели: {self.rating['overworked_teachers']}",
+            ),
+            (
+                len(self.errors) + 8,
+                f"Неиспользованные часы: {self.rating['unissued_hours']}",
+            ),
         ]
 
         for row, text in rating_info:
             sheet.cell(row=row, column=column_count + 2, value=text)
 
-    def _adjust_column_width(self, sheet: Worksheet, column_count: int, row_count: int) -> None:
+    def _adjust_column_width(
+        self, sheet: Worksheet, column_count: int, row_count: int
+    ) -> None:
         err_headers = ["Группа", "Предмет", "Остаток часов"]
         for col in range(1, column_count + len(err_headers) + 4):
             max_length = 0
