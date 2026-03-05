@@ -1258,7 +1258,7 @@ def check_exists_data() -> bool:
 
 def resource_path(relative_path: str) -> str:
     base_path = getattr(sys, "_MEIPASS", str(Path(__file__).resolve().parent))
-    return str(base_path / relative_path)
+    return str(Path(base_path) / relative_path)
 
 
 def get_data_file_path():
