@@ -5,15 +5,32 @@
 import datetime
 import os
 import shutil
+import sys
+import tempfile
+import glob
 
 import PyInstaller.__main__
 
+# Add project root to path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(project_root)
+
 from src import db
 
-dist_path = ""
+# ОЧИСТКА ВРЕМЕННЫХ ПАПОК PYINSTALLER
+temp_dir = tempfile.gettempdir()
+mei_folders = glob.glob(os.path.join(temp_dir, "_MEI*"))
+for folder in mei_folders:
+    try:
+        shutil.rmtree(folder, ignore_errors=True)
+        print(f"Cleaned up: {folder}")
+    except:
+        pass
+
+dist_path = os.path.abspath("dist")
 title = "SchPy"
-start_file = "../src/window.py"
-icon_name = "icon.ico"
+start_file = os.path.abspath("../src/window.py")
+icon_name = os.path.abspath("../icon.ico")
 no_console = True
 run_exe = True
 current_directory = os.path.dirname(os.path.abspath(__file__))
@@ -27,49 +44,49 @@ company_name = "savelychercov"
 product_name = "ScheduleMaker"
 description = "App for creating schedule for college"
 
+version_info_path = os.path.join(dist_path, "version_info.txt")
+
 version_template = f"""
 VSVersionInfo(
-    ffi=FixedFileInfo(
-        filevers=({major_version}, {minor_version}, {patch_version}, {build_number}),
-        prodvers=({major_version}, {minor_version}, {patch_version}, {build_number}),
-        mask=0x3f,
-        flags={"0x1" if debug else "0x0"},
-        OS=0x40004,
-        fileType=0x1,
-        subtype=0x0,
-        date={datetime.datetime.now().year, datetime.datetime.now().month}
+  ffi=FixedFileInfo(
+    filevers=({major_version}, {minor_version}, {patch_version}, {build_number}),
+    prodvers=({major_version}, {minor_version}, {patch_version}, {build_number}),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
     ),
-    kids=[
-        StringFileInfo([
-            StringTable(
-                u'040904E4',
-                [
-                    StringStruct(u'CompanyName', u'{company_name}'),
-                    StringStruct(u'FileDescription', u'{description}'),
-                    StringStruct(u'FileVersion', u'{f"{major_version}.{minor_version}.{patch_version}.{build_number}"}'),
-                    StringStruct(u'LegalCopyright', u'© {datetime.datetime.now().year} {company_name}'),
-                    StringStruct(u'ProductName', u'AppName'),
-                    StringStruct(u'ProductVersion', u'1.0.0.0'),
-                ]
-            )
-        ]),
-        VarFileInfo([VarStruct(u'Translation', [1033, 1252])])
-    ]
+  kids=[
+    StringFileInfo(
+      [
+      StringTable(
+        u'040904B0',
+        [StringStruct(u'CompanyName', u'{company_name}'),
+        StringStruct(u'FileDescription', u'{description}'),
+        StringStruct(u'FileVersion', u'{major_version}.{minor_version}.{patch_version}.{build_number}'),
+        StringStruct(u'InternalName', u'{title}'),
+        StringStruct(u'LegalCopyright', u'© {datetime.datetime.now().year} {company_name}'),
+        StringStruct(u'OriginalFilename', u'{title}.exe'),
+        StringStruct(u'ProductName', u'{product_name}'),
+        StringStruct(u'ProductVersion', u'{major_version}.{minor_version}.{patch_version}.{build_number}')])
+      ]),
+    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+  ]
 )
 """
 
-
-dirs = []
-
 files = [
-    "icon.ico",
-    "schedule_maker.py",
-    "best_of.py",
-    "db.py",
-    "MainWindow.css",
-    "InputDataDialog.css",
-    "ScheduleGeneratorDialog.css",
-    "ErrorDialog.css",
+    "../icon.ico",
+    "../src/schedule_maker.py",
+    "../src/best_of.py",
+    "../src/db.py",
+    "../src/schemas.py",
+    "../css/MainWindow.css",
+    "../css/InputDataDialog.css",
+    "../css/ScheduleGeneratorDialog.css",
+    "../css/ErrorDialog.css",
 ]
 
 command = [
@@ -80,36 +97,64 @@ command = [
     f"--name={title}",
     "--clean",
     f"--distpath={dist_path}",
-    f"--version-file={dist_path}/version_info.txt",
+    f"--workpath={os.path.join(dist_path, 'build_temp')}",
+    f"--specpath={dist_path}",
+    f"--version-file={version_info_path}",
 ]
 
 if no_console:
     command.append("--noconsole")
 
-for d in dirs:
-    command.append(f"--add-data={d};{d}/")
-
+# Добавляем все файлы
 for filename in files:
-    filename = os.path.join(current_directory, filename)
-    print("Adding file:", filename)
-    command.append(f"--add-data={filename};.")
+    full_path = os.path.join(current_directory, filename)
+    full_path = os.path.abspath(full_path)
+    if not os.path.exists(full_path):
+        print(f"Warning: File not found: {full_path}")
+        continue
+    print("Adding file:", full_path)
+
+    # Определяем место назначения
+    if filename.endswith('.css'):
+        dest = "css"
+    elif filename.endswith('.py'):
+        dest = "."
+    else:
+        dest = "."
+
+    command.append(f"--add-data={full_path}{os.pathsep}{dest}")
 
 
 def build():
-    shutil.rmtree(dist_path, ignore_errors=True)
+    # Создаем папку dist если её нет
     os.makedirs(dist_path, exist_ok=True)
-    with open(f"{dist_path}/version_info.txt", "w", encoding="utf-8") as f:
+
+    # Создаем version_info.txt
+    with open(version_info_path, "w", encoding="utf-8") as f:
         f.write(version_template)
 
+    print(f"Version file created at: {version_info_path}")
+
+    # Запускаем PyInstaller
+    print("Running PyInstaller with command:")
+    print(" ".join(command))
     PyInstaller.__main__.run(command)
 
-    shutil.rmtree(f"{dist_path}/{title}")
-    os.unlink(f"{title}.spec")
-    os.unlink(f"{dist_path}/version_info.txt")
+    # Очистка временных файлов
+    shutil.rmtree(os.path.join(dist_path, 'build_temp'), ignore_errors=True)
+    if os.path.exists(version_info_path):
+        os.unlink(version_info_path)
+    if os.path.exists(f"{title}.spec"):
+        os.unlink(f"{title}.spec")
 
 
 if __name__ == "__main__":
     build()
 
     if run_exe:
-        os.startfile(f"{dist_path}\\{title}.exe")
+        exe_path = os.path.join(dist_path, f"{title}.exe")
+        if os.path.exists(exe_path):
+            print(f"Starting {exe_path}")
+            os.startfile(exe_path)
+        else:
+            print(f"Error: {exe_path} not found!")

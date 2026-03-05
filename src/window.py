@@ -1450,7 +1450,7 @@ class MainWindow(QMainWindow):
 def global_exception_handler(exctype: type, value: BaseException, _: traceback):
     logger.error("Unhandled exception occurred: %s", value)
     # Сохраняем в старый файл для совместимости
-    with Path("../error_log.txt").open("a", encoding="utf-8") as f:
+    with Path("./error_log.txt").open("a", encoding="utf-8") as f:
         f.write(
             "{} Unhandled exception occurred: {}\n\n".format(
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), value
