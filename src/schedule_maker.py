@@ -197,7 +197,7 @@ def distribute_pairs(
                         e.hours = remaining_hours[group][discipline]
                         errors.append(e)
                     break  # Прерываем поиск после нахождения первого подходящего преподавателя
-    return full_schedule, errors  # Возвращаем полное расписание
+    return full_schedule, errors, remaining_hours  # Возвращаем полное расписание, ошибки и оставшиеся часы
 
 
 def distribute_classrooms(  # noqa: C901, PLR0912
@@ -275,6 +275,7 @@ def distribute_classrooms(  # noqa: C901, PLR0912
                     day_schedule[pair_number - 1] = False
                     assigned = True
                     pairs_with_classroom += 1
+                    pairs_without_classroom -= 1  # Уменьшаем счетчик пар без аудитории
                     if ENABLE_SCHEDULE_LOGS:
                         logger.debug(
                             "Assigned room %s to %s - %s at %s pair %d",
@@ -332,9 +333,13 @@ def make_full_schedule(data: DataSchema) -> Schedule:
         logger.info("Starting full schedule generation")
 
     working_data = copy.deepcopy(data)
-    full_schedule, errors = distribute_pairs(working_data)
+    full_schedule, errors, remaining_hours = distribute_pairs(working_data)
     full_schedule = distribute_classrooms(full_schedule, working_data)
     full_schedule = sorted_pairs(full_schedule)
+
+    # Обновляем remaining_data с вычтенными часами
+    remaining_data = copy.deepcopy(data)
+    remaining_data.discipline_hours = remaining_hours
 
     elapsed_time = time.time() - start_time
     if ENABLE_SCHEDULE_LOGS:
@@ -352,7 +357,7 @@ def make_full_schedule(data: DataSchema) -> Schedule:
             elapsed_time,
         )
 
-    return Schedule(pairs=full_schedule, errors=errors, remaining_data=data)
+    return Schedule(pairs=full_schedule, errors=errors, remaining_data=remaining_data)
 
 
 if __name__ == "__main__":

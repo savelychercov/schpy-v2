@@ -102,7 +102,7 @@ class ScheduleGeneratorWorkerThread(QThread):
         self.data = data
         self.best_data = None
         self.best_schedule_obj = None
-        self.best_rating = 0
+        self.best_rating = float('-inf')
         self.best_schedule_counts = None
         self.progress_value = 0
         self.remaining_time = 0
