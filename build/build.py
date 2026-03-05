@@ -144,8 +144,8 @@ def build():
     shutil.rmtree(os.path.join(dist_path, 'build_temp'), ignore_errors=True)
     if os.path.exists(version_info_path):
         os.unlink(version_info_path)
-    if os.path.exists(f"{title}.spec"):
-        os.unlink(f"{title}.spec")
+    if os.path.exists(f"{dist_path}/{title}.spec"):
+        os.unlink(f"{dist_path}/{title}.spec")
 
 
 if __name__ == "__main__":
