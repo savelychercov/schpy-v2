@@ -4,6 +4,9 @@
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Базовые настройки проекта
 BASE_DIR = Path(__file__).parent.parent
@@ -94,3 +97,4 @@ LOG_LEVELS = {
 # Настройки производительности
 ENABLE_DEBUG_LOGS = os.getenv("SCHPY_DEBUG", "false").lower() == "true"
 ENABLE_PERFORMANCE_LOGS = os.getenv("SCHPY_PERFORMANCE_LOGS", "false").lower() == "true"
+ENABLE_SCHEDULE_LOGS = os.getenv("SCHPY_SCHEDULE_LOGS", "false").lower() == "true"

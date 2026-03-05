@@ -27,7 +27,9 @@ from dataclasses import dataclass
 
 from config.constants import DAYS, PairType, RoomPrefix
 from config.logger import get_logger
+from config.settings import ENABLE_SCHEDULE_LOGS
 from src import db
+from src.db import PairTime, RoomSchedule
 from src.schemas import (
     DataSchema,
     PairSchema,
@@ -55,11 +57,12 @@ class Schedule:
 
 
 def print_schedule(schedule: dict[str, list[PairSchema]]) -> None:
-    logger.debug("Printing schedule:")
-    for group in schedule:
-        logger.debug("Group: %s", group)
-        for pair in schedule[group]:
-            logger.debug("  %s", pair)
+    if ENABLE_SCHEDULE_LOGS:
+        logger.debug("Printing schedule:")
+        for group in schedule:
+            logger.debug("Group: %s", group)
+            for pair in schedule[group]:
+                logger.debug("  %s", pair)
 
 
 def sorted_pairs(pairs: dict[str, list[PairSchema]]) -> dict[str, list[PairSchema]]:
@@ -117,14 +120,15 @@ def get_schedule_for(
 
 
 def print_errors(errors_list: list[ScheduleError]) -> None:
-    logger.warning("Schedule errors (%d):", len(errors_list))
-    for error in errors_list:
-        logger.warning(
-            "Cannot place pair for group %s, discipline %s, remaining hours: %d",
-            error.group,
-            error.discipline,
-            error.hours,
-        )
+    if ENABLE_SCHEDULE_LOGS:
+        logger.warning("Schedule errors (%d):", len(errors_list))
+        for error in errors_list:
+            logger.warning(
+                "Cannot place pair for group %s, discipline %s, remaining hours: %d",
+                error.group,
+                error.discipline,
+                error.hours,
+            )
 
 
 def choose_a_pair_time(
@@ -205,35 +209,96 @@ def distribute_pairs(
 
 
 def distribute_classrooms(
-    raw_sch: dict, data: DataSchema
+        raw_sch: dict, data: DataSchema
 ) -> dict[str, list[PairSchema]]:
-    raw_sch = raw_sch.copy()
     available_rooms: dict[str, RoomScheduleSchema] = data.rooms_availability_hours
-    for list_of_pairs in raw_sch.values():
+    if ENABLE_SCHEDULE_LOGS:
+        logger.info("Starting classroom distribution, available rooms: %d", len(available_rooms))
+
+    # Создаем временные рабочие копии расписаний
+    working_rooms = {}
+    for room_name, room_schedule in available_rooms.items():
+        working_rooms[room_name] = {
+            day: list(schedule)  # копируем списки
+            for day, schedule in room_schedule.schedule_for_days.items()
+        }
+        if ENABLE_SCHEDULE_LOGS:
+            logger.debug("Room %s initial state: %s", room_name,
+                         {day: working_rooms[room_name][day][:3] for day in ["Понедельник", "Вторник", "Среда"]})
+
+    pairs_without_classroom = 0
+    pairs_with_classroom = 0
+
+    for group, list_of_pairs in raw_sch.items():
         for pair in list_of_pairs:
             if pair.classroom is not None:
+                pairs_with_classroom += 1
                 continue
-            if pair.pair_type == PairType.ONLINE.value:  # Если онлайн
-                _available_rooms_list = [
-                    (room, sc)
-                    for room, sc in available_rooms.items()
-                    if room.startswith(RoomPrefix.DIGITAL.value)
-                ]
+            pairs_without_classroom += 1
+
+            # Определяем тип аудитории
+            if pair.pair_type == PairType.ONLINE.value:
+                prefix = RoomPrefix.DIGITAL.value
             else:
-                _available_rooms_list = [
-                    (room, sc)
-                    for room, sc in available_rooms.items()
-                    if room.startswith(RoomPrefix.CLASSROOM.value)
-                ]
-            for room, room_schedule in _available_rooms_list:
-                day_schedule = room_schedule.schedule_for_days[pair.day]
-                if not day_schedule[room_schedule.get_pair_number(pair.pair_time) - 1]:
-                    # Если пара свободна
-                    pair.classroom = room
-                    day_schedule[room_schedule.get_pair_number(pair.pair_time) - 1] = (
-                        True
-                    )
+                prefix = RoomPrefix.CLASSROOM.value
+
+            # Конвертируем время в номер пары
+            pair_time_db = PairTime(
+                pair.pair_time.start,
+                pair.pair_time.end,
+                pair.pair_time.pair_type
+            )
+            pair_number = RoomSchedule.get_pair_number(pair_time_db)
+
+            if pair_number is None:
+                if ENABLE_SCHEDULE_LOGS:
+                    logger.warning("Could not determine pair number for %s - %s at %s",
+                                   group, pair.discipline, pair.day)
+                continue
+
+            # Ищем свободную аудиторию
+            assigned = False
+            for room_name, room_schedule_dict in working_rooms.items():
+                if not room_name.startswith(prefix):
+                    continue
+
+                day_schedule = room_schedule_dict.get(pair.day)
+                if day_schedule is None:
+                    continue
+
+                # Проверяем доступность
+                if pair_number <= len(day_schedule) and day_schedule[pair_number - 1]:
+                    # Назначаем аудиторию
+                    pair.classroom = room_name
+                    day_schedule[pair_number - 1] = False
+                    assigned = True
+                    pairs_with_classroom += 1
+                    if ENABLE_SCHEDULE_LOGS:
+                        logger.debug("Assigned room %s to %s - %s at %s pair %d",
+                                     room_name, group, pair.discipline, pair.day, pair_number)
                     break
+
+            if not assigned and ENABLE_SCHEDULE_LOGS:
+                # Проверим, какие аудитории были доступны
+                available_at_time = []
+                for room_name, room_schedule_dict in working_rooms.items():
+                    if not room_name.startswith(prefix):
+                        continue
+                    day_schedule = room_schedule_dict.get(pair.day)
+                    if day_schedule and pair_number <= len(day_schedule):
+                        if day_schedule[pair_number - 1]:
+                            available_at_time.append(room_name)
+                logger.warning("No room for %s - %s at %s pair %d. Available rooms at that time: %s",
+                               group, pair.discipline, pair.day, pair_number, available_at_time)
+
+    if ENABLE_SCHEDULE_LOGS:
+        # Покажем финальное состояние аудиторий
+        for room_name, room_schedule_dict in working_rooms.items():
+            logger.debug("Room %s final state: %s", room_name,
+                         {day: room_schedule_dict[day][:3] for day in ["Понедельник", "Вторник", "Среда"]})
+        logger.info("Classroom distribution completed. Pairs processed: %d, with classrooms: %d, without: %d",
+                    pairs_without_classroom + pairs_with_classroom, pairs_with_classroom, pairs_without_classroom)
+
     return raw_sch
 
 
@@ -241,27 +306,23 @@ def make_full_schedule(data: DataSchema) -> Schedule:
     import time
 
     start_time = time.time()
-    logger.info("Starting full schedule generation")
-    logger.debug(
-        "Input data: groups=%d, teachers=%d",
-        len(data.discipline_hours),
-        len(data.teachers),
-    )
+    if ENABLE_SCHEDULE_LOGS:
+        logger.info("Starting full schedule generation")
 
-    data = copy.deepcopy(data)
-    full_schedule, errors = distribute_pairs(data)
-    logger.info("Pairs distribution completed, errors: %d", len(errors))
-
-    full_schedule = distribute_classrooms(full_schedule, data)
-    logger.info("Classrooms distribution completed")
-
+    working_data = copy.deepcopy(data)
+    full_schedule, errors = distribute_pairs(working_data)
+    full_schedule = distribute_classrooms(full_schedule, working_data)
     full_schedule = sorted_pairs(full_schedule)
+
     elapsed_time = time.time() - start_time
-    logger.info(
-        "Schedule generation completed, groups: %d, time: %.2fs",
-        len(full_schedule),
-        elapsed_time,
-    )
+    if ENABLE_SCHEDULE_LOGS:
+        total_pairs = sum(len(pairs) for pairs in full_schedule.values())
+        pairs_with_rooms = sum(1 for pairs in full_schedule.values() for pair in pairs if pair.classroom is not None)
+        logger.info(
+            "Schedule generation completed, total pairs: %d, with rooms: %d, time: %.2fs",
+            total_pairs, pairs_with_rooms, elapsed_time,
+        )
+
     return Schedule(pairs=full_schedule, errors=errors, remaining_data=data)
 
 

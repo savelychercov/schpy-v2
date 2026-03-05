@@ -219,11 +219,35 @@ class TeachersSchedule:  # teachers_schedule: day, pairs
             str_list.append(s)
         return "[" + ", ".join(str_list) + "]"
 
+    @classmethod
+    def from_schema(cls, schema: "TeachersScheduleSchema") -> "TeachersSchedule":
+        """Создать TeachersSchedule из TeachersScheduleSchema"""
+        from config.constants import DAY_MAPPING
+
+        # Конвертируем английские поля в русские названия
+        schedule_data = {}
+        for eng_field, rus_name in DAY_MAPPING.items():
+            schedule_data[rus_name] = getattr(schema, eng_field)
+
+        return cls(**schedule_data)
+
+    def to_schema(self) -> "TeachersScheduleSchema":
+        """Конвертировать TeachersSchedule в TeachersScheduleSchema"""
+        from config.constants import DAY_MAPPING
+        from src.schemas import TeachersScheduleSchema
+
+        # Конвертируем русские названия в английские поля
+        schema_data = {}
+        for eng_field, rus_name in DAY_MAPPING.items():
+            schema_data[eng_field] = self.schedule_for_days[rus_name]
+
+        return TeachersScheduleSchema(**schema_data)
+
 
 class RoomSchedule:
     """
-    False - Аудитория свободна
-    True - Аудитория занята или пару нельзя поставить на это время
+    True - Аудитория свободна
+    False - Аудитория занята или пару нельзя поставить на это время
     """
 
     def __init__(
@@ -247,9 +271,9 @@ class RoomSchedule:
         }
         for day in self.schedule_for_days:
             if self.schedule_for_days[day] is None:
-                self.schedule_for_days[day] = [False] * PAIRS_PER_DAY
+                self.schedule_for_days[day] = [True] * PAIRS_PER_DAY
             while len(self.schedule_for_days[day]) < PAIRS_PER_DAY:
-                self.schedule_for_days[day].append(False)
+                self.schedule_for_days[day].append(True)
 
     @staticmethod
     def get_pair_number(pair_time: PairTime) -> int | None:
@@ -260,6 +284,35 @@ class RoomSchedule:
 
     def __repr__(self):
         return str(self.schedule_for_days)
+
+    def take_pair(self, day: str, pair_number: int) -> None:
+        """Занять время для пары"""
+        if day in self.schedule_for_days:
+            self.schedule_for_days[day][pair_number - 1] = False
+
+    @classmethod
+    def from_schema(cls, schema: "RoomScheduleSchema") -> "RoomSchedule":
+        """Создать RoomSchedule из RoomScheduleSchema"""
+        from config.constants import DAY_MAPPING
+
+        # Конвертируем английские поля в русские названия
+        schedule_data = {}
+        for eng_field, rus_name in DAY_MAPPING.items():
+            schedule_data[rus_name] = getattr(schema, eng_field)
+
+        return cls(**schedule_data)
+
+    def to_schema(self) -> "RoomScheduleSchema":
+        """Конвертировать RoomSchedule в RoomScheduleSchema"""
+        from config.constants import DAY_MAPPING
+        from src.schemas import RoomScheduleSchema
+
+        # Конвертируем русские названия в английские поля
+        schema_data = {}
+        for eng_field, rus_name in DAY_MAPPING.items():
+            schema_data[eng_field] = self.schedule_for_days[rus_name]
+
+        return RoomScheduleSchema(**schema_data)
 
 
 class Room:
@@ -813,6 +866,8 @@ def get_db_session():
 
 def save_data_sqlalchemy(data) -> None:
     """Сохранение данных с использованием SQLAlchemy + Pydantic схемы"""
+    print(f"Сохранение в БД: {data.rooms_availability_hours = }")
+
     logger.info("Saving data to SQLAlchemy database")
     logger.debug(
         "Saving data: counter=%d, groups=%d, teachers=%d",
@@ -1126,7 +1181,7 @@ def load_data_sqlalchemy() -> Data:
 
                 room_schedule.schedule_for_days[schedule_model.day][
                     schedule_model.pair_number - 1
-                ] = not schedule_model.is_available
+                ] = schedule_model.is_available
 
             data.rooms_availability_hours[room_model.name] = room_schedule
             data.rooms[room_model.name] = Room(is_online=room_model.is_online)
@@ -1205,6 +1260,9 @@ def load_data_sqlalchemy() -> Data:
             len(data.teachers),
             len(data.rooms),
         )
+
+        print(f"ЗАГРУЖЕНО ИЗ БД: {data.rooms_availability_hours = }")
+
         return data
 
     except Exception as e:

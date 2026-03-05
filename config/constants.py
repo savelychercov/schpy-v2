@@ -18,6 +18,17 @@ SHIFT_THREE = 3
 # Временные константы
 SECONDS_PER_MINUTE = 60
 
+# Маппинг дней недели для схем (английские поля -> русские названия)
+DAY_MAPPING = {
+    "monday": "Понедельник",
+    "tuesday": "Вторник",
+    "wednesday": "Среда",
+    "thursday": "Четверг",
+    "friday": "Пятница",
+    "saturday": "Суббота",
+    "sunday": "Воскресенье",
+}
+
 
 class PairType(str, Enum):
     """Типы учебных пар."""

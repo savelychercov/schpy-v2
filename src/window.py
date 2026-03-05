@@ -62,10 +62,13 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+import typing
 
 from config.constants import (
     DEFAULT_ITERATIONS,
+    DAY_MAPPING,
     EXCEL_COLUMN_WIDTH_PADDING,
+    ExportError,
     HELP_LABEL_WIDTH,
     MAX_ITERATIONS,
     MIN_ITERATIONS,
@@ -77,7 +80,6 @@ from config.constants import (
     WINDOW_WIDTH,
     WINDOW_X,
     WINDOW_Y,
-    ExportError,
 )
 from config.logger import get_logger
 from config.messages import (
@@ -214,7 +216,8 @@ class ScheduleGeneratorDialog(QDialog):
 
         self.setLayout(layout)
 
-    def closeEvent(self, event):  # noqa: ANN001  # noqa: ANN001
+    @typing.override
+    def closeEvent(self, event):  # noqa: ANN001
         if self.worker_thread and self.worker_thread.isRunning():
             self.worker_thread.stop()
         super().closeEvent(event)
@@ -355,6 +358,7 @@ class InputDataDialog(QDialog):
         if self.variable_list.count() > 0:
             self.variable_list.setCurrentRow(0)
 
+    @typing.override
     def closeEvent(self, event):  # noqa: ANN001
         # Auto-save data when dialog is closed
         try:
@@ -628,11 +632,27 @@ class InputDataDialog(QDialog):
             if name in schedule_data:
                 schedule_data[name].schedule_for_days = updated_schedule
             elif self.current_variable == "teachers_work_hours":
-                schedule_data[name] = db.TeachersSchedule(
-                    *list(updated_schedule.values())
-                )
+                # Создаем TeachersSchedule с правильным порядком параметров
+                params = []
+                num_pairs = len(self.data.teachers_schedule_time)
+                for eng_field in ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]:
+                    rus_name = DAY_MAPPING[eng_field]
+                    day_data = updated_schedule.get(rus_name)
+                    if day_data is None:
+                        day_data = [False] * num_pairs
+                    params.append(day_data)
+                schedule_data[name] = db.TeachersSchedule(*params)
             elif self.current_variable == "rooms_availability_hours":
-                schedule_data[name] = db.RoomSchedule(*list(updated_schedule.values()))
+                # Создаем RoomSchedule с правильным порядком параметров
+                params = []
+                num_pairs = len(self.data.teachers_schedule_time)
+                for eng_field in ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]:
+                    rus_name = DAY_MAPPING[eng_field]
+                    day_data = updated_schedule.get(rus_name)
+                    if day_data is None:
+                        day_data = [False] * num_pairs
+                    params.append(day_data)
+                schedule_data[name] = db.RoomSchedule(*params)
 
     def save_changes(self):
         """Save changes made to the current variable data."""
@@ -1161,7 +1181,10 @@ class MainWindow(QMainWindow):
     def generate_schedule(self):
         start_time = time.time()
         logger.info("Starting schedule generation")
-        sch = schedule_maker.make_full_schedule(self.data)
+        print(f"ДО ГЕНЕРАЦИИ {self.data.rooms_availability_hours = }")
+        working_data = copy.deepcopy(self.data)
+        sch = schedule_maker.make_full_schedule(working_data)
+        print(f"ПОСЛЕ ГЕНЕРАЦИИ {self.data.rooms_availability_hours = }")
         self.current_schedule = sch
         self.errors = sch.errors
         elapsed_time = time.time() - start_time
