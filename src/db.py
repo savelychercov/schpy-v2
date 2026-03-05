@@ -42,7 +42,9 @@
 """
 
 import json
+import shutil
 import sys
+import tempfile
 from abc import ABC, abstractmethod
 from datetime import time, timedelta
 from pathlib import Path
@@ -1263,23 +1265,27 @@ def resource_path(relative_path: str) -> str:
         if relative_path.startswith("../css/"):
             css_filename = relative_path.replace("../css/", "")
             source_path = Path(base_path) / "css" / css_filename
-            import tempfile
+
             temp_dir = Path(tempfile.gettempdir()) / "schpy_css"
             temp_dir.mkdir(exist_ok=True)
             dest_path = temp_dir / css_filename
-            if not dest_path.exists() or dest_path.stat().st_size != source_path.stat().st_size:
-                import shutil
+            if (
+                not dest_path.exists()
+                or dest_path.stat().st_size != source_path.stat().st_size
+            ):
                 shutil.copy2(source_path, dest_path)
             return str(dest_path)
 
         if relative_path == "../icon.ico":
             source_path = Path(base_path) / "icon.ico"
-            import tempfile
+
             temp_dir = Path(tempfile.gettempdir()) / "schpy_icons"
             temp_dir.mkdir(exist_ok=True)
             dest_path = temp_dir / "icon.ico"
-            if not dest_path.exists() or dest_path.stat().st_size != source_path.stat().st_size:
-                import shutil
+            if (
+                not dest_path.exists()
+                or dest_path.stat().st_size != source_path.stat().st_size
+            ):
                 shutil.copy2(source_path, dest_path)
             return str(dest_path)
 

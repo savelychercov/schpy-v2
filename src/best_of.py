@@ -178,19 +178,31 @@ def rate_schedule(
 ) -> float:
     rate = 100
     teachers_gaps_count = count_teachers_gaps(original_data, remaining_data)
-    logger.info("teachers_gaps_count: %d, modifier: %d", teachers_gaps_count, TEACHERS_GAPS_RATING_MODIFIER)
+    logger.info(
+        "teachers_gaps_count: %d, modifier: %d",
+        teachers_gaps_count,
+        TEACHERS_GAPS_RATING_MODIFIER,
+    )
     rate = sub_percentage(rate, teachers_gaps_count * TEACHERS_GAPS_RATING_MODIFIER)
     if ENABLE_SCHEDULE_LOGS:
         logger.debug("after teachers_gaps_count %f", rate)
 
     offline_pairs_gaps = count_offline_pairs_gaps(schedule, original_data)
-    logger.info("offline_pairs_gaps: %d, modifier: %d", offline_pairs_gaps, OFFLINE_PAIRS_GAPS_RATING_MODIFIER)
+    logger.info(
+        "offline_pairs_gaps: %d, modifier: %d",
+        offline_pairs_gaps,
+        OFFLINE_PAIRS_GAPS_RATING_MODIFIER,
+    )
     rate = sub_percentage(rate, offline_pairs_gaps * OFFLINE_PAIRS_GAPS_RATING_MODIFIER)
     if ENABLE_SCHEDULE_LOGS:
         logger.debug("after offline_pairs_gaps %f", rate)
 
     overworked_teachers = count_overworked_teachers(schedule)
-    logger.info("overworked_teachers: %d, modifier: %d", overworked_teachers, OVERWORKED_TEACHERS_RATING_MODIFIER)
+    logger.info(
+        "overworked_teachers: %d, modifier: %d",
+        overworked_teachers,
+        OVERWORKED_TEACHERS_RATING_MODIFIER,
+    )
     rate = sub_percentage(
         rate, overworked_teachers * OVERWORKED_TEACHERS_RATING_MODIFIER
     )
@@ -198,7 +210,11 @@ def rate_schedule(
         logger.debug("after overworked_teachers %f", rate)
 
     unissued_hours = count_unissued_hours(remaining_data)
-    logger.info("unissued_hours: %d, modifier: %d", unissued_hours, UNISSUED_HOURS_RATING_MODIFIER)
+    logger.info(
+        "unissued_hours: %d, modifier: %d",
+        unissued_hours,
+        UNISSUED_HOURS_RATING_MODIFIER,
+    )
     rate = sub_percentage(rate, unissued_hours * UNISSUED_HOURS_RATING_MODIFIER)
     if ENABLE_SCHEDULE_LOGS:
         logger.debug("after unissued_hours %f", rate)

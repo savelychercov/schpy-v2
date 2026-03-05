@@ -27,7 +27,7 @@ for folder in mei_folders:
     except:
         pass
 
-dist_path = os.path.abspath("dist")
+dist_path = os.path.abspath("../dist")
 title = "SchPy"
 start_file = os.path.abspath("../src/window.py")
 icon_name = os.path.abspath("../icon.ico")

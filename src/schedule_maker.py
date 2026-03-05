@@ -197,7 +197,11 @@ def distribute_pairs(
                         e.hours = remaining_hours[group][discipline]
                         errors.append(e)
                     break  # Прерываем поиск после нахождения первого подходящего преподавателя
-    return full_schedule, errors, remaining_hours  # Возвращаем полное расписание, ошибки и оставшиеся часы
+    return (
+        full_schedule,
+        errors,
+        remaining_hours,
+    )  # Возвращаем полное расписание, ошибки и оставшиеся часы
 
 
 def distribute_classrooms(  # noqa: C901, PLR0912
